@@ -29,7 +29,7 @@ mod special {
         fn mut_me_somehow(self: Pin<&mut Self>);
     }
 
-    impl<T: Default> MutMeSomehow for Box<T> {
+    impl<T: ?Sized + Default> MutMeSomehow for Box<T> {
         fn mut_me_somehow(mut self: Pin<&mut Self>) {
             *self = Default::default();
         }
