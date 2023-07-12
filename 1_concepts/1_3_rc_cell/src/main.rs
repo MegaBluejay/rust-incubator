@@ -1,21 +1,22 @@
+use std::{thread, time::Duration};
+
 use gstack::GlobalStack;
 
 mod gstack {
-    use std::{cell::RefCell, rc::Rc};
+    use std::sync::{Arc, Mutex};
 
-    pub struct GlobalStack<T>(Rc<RefCell<Vec<T>>>);
+    pub struct GlobalStack<T>(Arc<Mutex<Vec<T>>>);
 
     impl<T> GlobalStack<T> {
         pub fn new() -> Self {
-            Self(Rc::new(RefCell::new(vec![])))
+            Self(Arc::new(Mutex::new(vec![])))
         }
-
         pub fn push(&self, item: T) {
-            self.0.borrow_mut().push(item)
+            self.0.lock().unwrap().push(item)
         }
 
         pub fn pop(&self) -> Option<T> {
-            self.0.borrow_mut().pop()
+            self.0.lock().unwrap().pop()
         }
     }
 
@@ -28,8 +29,11 @@ mod gstack {
 
 fn main() {
     let stack = GlobalStack::new();
-    let (stack1, stack2) = (&stack, &stack);
-    stack1.push(1);
-    stack2.push(2);
-    println!("{:?}", stack1.pop());
+    let thread_stack = stack.clone();
+    thread::spawn(move || {
+        thread_stack.push(2);
+    });
+    stack.push(1);
+    thread::sleep(Duration::from_secs(1));
+    println!("{:?}, {:?}", stack.pop(), stack.pop());
 }
