@@ -1,4 +1,7 @@
-use email::{EmailError, EmailStr, EmailString};
+use crate::{
+    email::{EmailError, EmailStr, EmailString},
+    random::Random,
+};
 
 mod email {
     use std::{borrow::Borrow, fmt::Display, ops::Deref};
@@ -105,15 +108,41 @@ mod email {
     }
 }
 
+mod random {
+    use std::ops::Deref;
+
+    use rand::Rng;
+
+    pub struct Random<T>([T; 3]);
+
+    impl<T> Random<T> {
+        pub fn new(x: T, y: T, z: T) -> Self {
+            Self([x, y, z])
+        }
+    }
+
+    impl<T> Deref for Random<T> {
+        type Target = T;
+
+        fn deref(&self) -> &Self::Target {
+            let mut rng = rand::thread_rng();
+            let n = rng.gen_range(0..3);
+            &self.0[n]
+        }
+    }
+}
+
 fn main() {
     let invalid: Result<&EmailStr, EmailError> = "something".try_into();
     let raw_email_str: &str = "example@email.com";
     let email_str: &EmailStr = raw_email_str.try_into().unwrap();
     let email_string1: EmailString = email_str.to_owned();
     let email_string2: EmailString = raw_email_str.to_owned().try_into().unwrap();
-
     println!(
         "{:?}, {}, {}, {}",
         invalid, email_str, email_string1, email_string2
     );
+
+    let rand = Random::new(1, 2, 3);
+    println!("{}, {}, {}", *rand, *rand, *rand);
 }
