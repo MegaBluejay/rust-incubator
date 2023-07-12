@@ -101,6 +101,12 @@ mod email {
         }
     }
 
+    impl AsRef<EmailStr> for EmailString {
+        fn as_ref(&self) -> &EmailStr {
+            self
+        }
+    }
+
     impl AsRef<str> for EmailString {
         fn as_ref(&self) -> &str {
             self.deref().as_ref()
