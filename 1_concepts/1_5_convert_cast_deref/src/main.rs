@@ -115,7 +115,10 @@ mod email {
 }
 
 mod random {
-    use std::ops::Deref;
+    use std::{
+        borrow::{Borrow, BorrowMut},
+        ops::{Deref, DerefMut},
+    };
 
     use rand::Rng;
 
@@ -131,9 +134,37 @@ mod random {
         type Target = T;
 
         fn deref(&self) -> &Self::Target {
-            let mut rng = rand::thread_rng();
-            let n = rng.gen_range(0..3);
-            &self.0[n]
+            &self.0[rand::thread_rng().gen_range(0..3)]
+        }
+    }
+
+    impl<T> DerefMut for Random<T> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0[rand::thread_rng().gen_range(0..3)]
+        }
+    }
+
+    impl<T> Borrow<T> for Random<T> {
+        fn borrow(&self) -> &T {
+            self
+        }
+    }
+
+    impl<T> BorrowMut<T> for Random<T> {
+        fn borrow_mut(&mut self) -> &mut T {
+            self
+        }
+    }
+
+    impl<T> AsRef<T> for Random<T> {
+        fn as_ref(&self) -> &T {
+            self
+        }
+    }
+
+    impl<T> AsMut<T> for Random<T> {
+        fn as_mut(&mut self) -> &mut T {
+            self
         }
     }
 }
@@ -149,6 +180,7 @@ fn main() {
         invalid, email_str, email_string1, email_string2
     );
 
-    let rand = Random::new(1, 2, 3);
+    let mut rand = Random::new(1, 2, 3);
+    *rand = 10;
     println!("{}, {}, {}", *rand, *rand, *rand);
 }
