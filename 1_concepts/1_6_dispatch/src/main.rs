@@ -13,8 +13,14 @@ pub struct User {
     activated: bool,
 }
 
+#[derive(Debug)]
+pub enum UserError {
+    NotFound,
+    AlreadyExists,
+}
+
 mod dynamic_dispatch {
-    use crate::{Storage, User};
+    use crate::{Storage, User, UserError};
 
     pub struct UserRepository<'a>(&'a mut dyn Storage<u64, User>);
 
@@ -23,31 +29,36 @@ mod dynamic_dispatch {
             Self(storage)
         }
 
-        pub fn add(&mut self, user: User) -> bool {
+        pub fn add(&mut self, user: User) -> Result<(), UserError> {
             if self.0.get(&user.id).is_some() {
-                false
+                Err(UserError::AlreadyExists)
             } else {
                 self.0.set(user.id, user);
-                true
+                Ok(())
             }
         }
 
-        pub fn get(&self, id: u64) -> Option<&User> {
-            self.0.get(&id)
+        pub fn get(&self, id: u64) -> Result<&User, UserError> {
+            self.0.get(&id).ok_or(UserError::NotFound)
         }
 
-        pub fn update(&mut self, user: User) {
-            self.0.set(user.id, user);
+        pub fn update(&mut self, user: User) -> Result<(), UserError> {
+            if self.0.get(&user.id).is_none() {
+                Err(UserError::NotFound)
+            } else {
+                self.0.set(user.id, user);
+                Ok(())
+            }
         }
 
-        pub fn remove(&mut self, id: u64) -> Option<User> {
-            self.0.remove(&id)
+        pub fn remove(&mut self, id: u64) -> Result<User, UserError> {
+            self.0.remove(&id).ok_or(UserError::NotFound)
         }
     }
 }
 
 mod static_dispatch {
-    use crate::{Storage, User};
+    use crate::{Storage, User, UserError};
 
     pub struct UserRepository<'a, T>(&'a mut T);
 
@@ -56,25 +67,30 @@ mod static_dispatch {
             Self(storage)
         }
 
-        pub fn add(&mut self, user: User) -> bool {
+        pub fn add(&mut self, user: User) -> Result<(), UserError> {
             if self.0.get(&user.id).is_some() {
-                false
+                Err(UserError::AlreadyExists)
             } else {
                 self.0.set(user.id, user);
-                true
+                Ok(())
             }
         }
 
-        pub fn get(&self, id: u64) -> Option<&User> {
-            self.0.get(&id)
+        pub fn get(&self, id: u64) -> Result<&User, UserError> {
+            self.0.get(&id).ok_or(UserError::NotFound)
         }
 
-        pub fn update(&mut self, user: User) {
-            self.0.set(user.id, user);
+        pub fn update(&mut self, user: User) -> Result<(), UserError> {
+            if self.0.get(&user.id).is_none() {
+                Err(UserError::NotFound)
+            } else {
+                self.0.set(user.id, user);
+                Ok(())
+            }
         }
 
-        pub fn remove(&mut self, id: u64) -> Option<User> {
-            self.0.remove(&id)
+        pub fn remove(&mut self, id: u64) -> Result<User, UserError> {
+            self.0.remove(&id).ok_or(UserError::NotFound)
         }
     }
 }
@@ -98,11 +114,13 @@ impl<K: Eq + Hash, V> Storage<K, V> for HashStorage<K, V> {
 fn main() {
     let mut storage = HashStorage(HashMap::new());
     let mut dyn_repo = dynamic_dispatch::UserRepository::new(&mut storage);
-    dyn_repo.add(User {
-        id: 1,
-        email: "email".into(),
-        activated: true,
-    });
+    dyn_repo
+        .add(User {
+            id: 1,
+            email: "email".into(),
+            activated: true,
+        })
+        .unwrap();
     let stat_repo = static_dispatch::UserRepository::new(&mut storage);
     println!("{:?}", stat_repo.get(1));
 }
