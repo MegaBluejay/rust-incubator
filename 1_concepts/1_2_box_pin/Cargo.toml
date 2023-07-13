@@ -3,3 +3,8 @@ name = "step_1_2"
 version = "0.1.0"
 edition = "2021"
 publish = false
+
+[dependencies]
+futures = "0.3.28"
+futures-timer = "3.0.2"
+pin-project = "1.1.2"
