@@ -157,14 +157,20 @@ mod tests {
 
     #[test]
     fn create() {
-        let user = User {
+        let user1 = User {
             id: 1,
             email: "email@email.com".into(),
             activated: false,
         };
+        let user2 = User {
+            id: 2,
+            email: "email2@email.com".into(),
+            activated: true,
+        };
         let repo = VecAddedRepo(RefCell::new(vec![]));
-        user.handle_command(&CreateUser, &repo).unwrap();
-        assert_eq!(repo.0.into_inner(), vec![user]);
+        user1.handle_command(&CreateUser, &repo).unwrap();
+        user2.handle_command(&CreateUser, &repo).unwrap();
+        assert_eq!(repo.0.into_inner(), vec![user1, user2]);
     }
 }
 
