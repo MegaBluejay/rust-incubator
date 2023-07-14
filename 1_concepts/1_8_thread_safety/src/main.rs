@@ -1,64 +1,40 @@
 use std::{
     cell::Cell,
-    marker::PhantomData,
     rc::Rc,
     sync::{Mutex, MutexGuard},
     thread,
 };
 
 #[derive(Debug)]
-struct OnlySync<'a>(PhantomData<MutexGuard<'a, ()>>);
+struct OnlySync<'a>(MutexGuard<'a, ()>);
 
 #[derive(Debug)]
-struct OnlySend(PhantomData<Cell<()>>);
+struct OnlySend(Cell<()>);
 
 #[derive(Debug)]
-struct SyncAndSend(PhantomData<Mutex<()>>);
+struct SyncAndSend(Mutex<()>);
 
 #[derive(Debug)]
-struct NotSyncNotSend(PhantomData<Rc<()>>);
+struct NotSyncNotSend(Rc<()>);
 
 fn main() {
-    let sync = OnlySync(PhantomData);
-    let send = OnlySend(PhantomData);
-    let both = SyncAndSend(PhantomData);
-    let none = NotSyncNotSend(PhantomData);
+    let both = SyncAndSend(Mutex::new(()));
+    let sync = OnlySync(both.0.lock().unwrap());
 
     thread::scope(|s| {
-        s.spawn(|| {
-            println!("{:?}", &sync);
-        });
-
         s.spawn(|| {
             println!("{:?}", &both);
+            println!("{:?}", &sync);
         });
-
-        // s.spawn(|| {
-        //     println!("{:?}", &send);
-        // });
-
-        // s.spawn(|| {
-        //     println!("{:?}", &none);
-        // })
     });
 
-    thread::scope(|s| {
-        s.spawn(move || {
-            println!("{:?}", send);
-        });
+    drop(sync);
 
-        s.spawn(move || {
-            println!("{:?}", both);
-        });
-
-        // s.spawn(move || {
-        //     println!("{:?}", sync);
-        // });
-
-        // s.spawn(move || {
-        //     println!("{:?}", none);
-        // });
-    });
-
-    println!("{:?}", none);
+    let send = OnlySend(Cell::new(()));
+    thread::spawn(move || {
+        println!("{:?}", both);
+        println!("{:?}", send);
+    })
+    .join()
+    .unwrap();
 }
