@@ -15,7 +15,7 @@ mod email {
 
     #[derive(Debug)]
     #[repr(transparent)]
-    pub struct EmailString(String);
+    pub struct EmailString(Box<str>);
 
     #[derive(RefCast, Debug)]
     #[repr(transparent)]
@@ -87,7 +87,7 @@ mod email {
 
         fn try_from(value: String) -> Result<Self, Self::Error> {
             match TryInto::<&EmailStr>::try_into(value.as_str()) {
-                Ok(_) => Ok(Self(value)),
+                Ok(_) => Ok(Self(value.into())),
                 Err(err) => Err(err),
             }
         }
