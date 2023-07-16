@@ -101,14 +101,12 @@ mod email {
         }
     }
 
-    impl AsRef<EmailStr> for EmailString {
-        fn as_ref(&self) -> &EmailStr {
-            self
-        }
-    }
-
-    impl AsRef<str> for EmailString {
-        fn as_ref(&self) -> &str {
+    impl<T> AsRef<T> for EmailString
+    where
+        T: ?Sized,
+        EmailStr: AsRef<T>,
+    {
+        fn as_ref(&self) -> &T {
             self.deref().as_ref()
         }
     }
