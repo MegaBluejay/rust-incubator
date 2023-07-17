@@ -1,7 +1,10 @@
 #![allow(dead_code)]
 
 mod list {
-    use std::sync::{Arc, Mutex};
+    use std::{
+        iter::FusedIterator,
+        sync::{Arc, Mutex},
+    };
 
     type Neigh<T> = Option<Arc<Mutex<Node<T>>>>;
 
@@ -211,6 +214,8 @@ mod list {
         }
     }
 
+    impl<T> FusedIterator for IntoIter<T> {}
+
     impl<T> IntoIterator for List<T> {
         type Item = T;
 
@@ -218,6 +223,16 @@ mod list {
 
         fn into_iter(self) -> Self::IntoIter {
             IntoIter(self.0.into_inner().unwrap())
+        }
+    }
+
+    impl<T> FromIterator<T> for List<T> {
+        fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+            let mut ends = Ends::new();
+            for item in iter {
+                ends.push_back(item);
+            }
+            Self(Mutex::new(ends))
         }
     }
 }
