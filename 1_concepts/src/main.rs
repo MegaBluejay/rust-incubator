@@ -159,30 +159,28 @@ mod list {
         }
     }
 
+    macro_rules! impl_inner {
+        ($vis:vis fn $name:ident(&self $(, $i:ident : $t:ty)*) $(-> $res:ty)?) => {
+            $vis fn $name(&self $(, $i : $t)*) $(-> $res)? {
+                self.0.lock().unwrap().$name($($i ,)*)
+            }
+        };
+    }
+
     impl<T> List<T> {
         pub fn new() -> Self {
             Self(Mutex::new(Ends::new()))
         }
 
-        pub fn push_back(&self, item: T) {
-            self.0.lock().unwrap().push_back(item)
-        }
+        impl_inner! { pub fn push_back(&self, item: T) }
 
-        pub fn push_front(&self, item: T) {
-            self.0.lock().unwrap().push_front(item)
-        }
+        impl_inner! { pub fn push_front(&self, item: T) }
 
-        pub fn pop_back(&self) -> Option<T> {
-            self.0.lock().unwrap().pop_back()
-        }
+        impl_inner! { pub fn pop_back(&self) -> Option<T> }
 
-        pub fn pop_front(&self) -> Option<T> {
-            self.0.lock().unwrap().pop_front()
-        }
+        impl_inner! { pub fn pop_front(&self) -> Option<T> }
 
-        pub fn is_empty(&self) -> bool {
-            self.0.lock().unwrap().is_empty()
-        }
+        impl_inner! { pub fn is_empty(&self) -> bool }
     }
 
     pub struct IntoIter<T>(Neigh<T>);
