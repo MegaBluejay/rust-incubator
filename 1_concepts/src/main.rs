@@ -168,6 +168,12 @@ mod list {
         }
     }
 
+    impl<T> Drop for Ends<T> {
+        fn drop(&mut self) {
+            while self.pop_back().is_some() {}
+        }
+    }
+
     macro_rules! impl_inner {
         ($vis:vis fn $name:ident(&self $(, $i:ident : $t:ty)*) $(-> $res:ty)?) => {
             $vis fn $name(&self $(, $i : $t)*) $(-> $res)? {
