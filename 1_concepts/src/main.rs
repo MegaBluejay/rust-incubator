@@ -93,6 +93,12 @@ mod list {
 
     pub struct List<T>(Mutex<Ends<T>>);
 
+    impl<T> Default for Ends<T> {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl<T> Ends<T> {
         fn new() -> Self {
             Self {
@@ -165,6 +171,12 @@ mod list {
                 self.0.lock().unwrap().$name($($i ,)*)
             }
         };
+    }
+
+    impl<T> Default for List<T> {
+        fn default() -> Self {
+            Self::new()
+        }
     }
 
     impl<T> List<T> {
