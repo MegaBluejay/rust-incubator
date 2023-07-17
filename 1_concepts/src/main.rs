@@ -166,11 +166,15 @@ mod list {
         fn is_empty(&self) -> bool {
             self.head.is_none()
         }
+
+        fn clear(&mut self) {
+            while self.pop_back().is_some() {}
+        }
     }
 
     impl<T> Drop for Ends<T> {
         fn drop(&mut self) {
-            while self.pop_back().is_some() {}
+            self.clear();
         }
     }
 
@@ -202,6 +206,8 @@ mod list {
         impl_inner! { pub fn pop_front(&self) -> Option<T> }
 
         impl_inner! { pub fn is_empty(&self) -> bool }
+
+        impl_inner! { pub fn clear(&self) }
     }
 
     pub struct IntoIter<T>(Ends<T>);
