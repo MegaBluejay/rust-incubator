@@ -195,7 +195,21 @@ mod list {
         impl_inner! { pub fn is_empty(&self) -> bool }
     }
 
-    pub struct IntoIter<T>(Neigh<T>);
+    pub struct IntoIter<T>(Ends<T>);
+
+    impl<T> Iterator for IntoIter<T> {
+        type Item = T;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            self.0.pop_front()
+        }
+    }
+
+    impl<T> DoubleEndedIterator for IntoIter<T> {
+        fn next_back(&mut self) -> Option<Self::Item> {
+            self.0.pop_back()
+        }
+    }
 
     impl<T> IntoIterator for List<T> {
         type Item = T;
@@ -203,21 +217,7 @@ mod list {
         type IntoIter = IntoIter<T>;
 
         fn into_iter(self) -> Self::IntoIter {
-            IntoIter(self.0.into_inner().unwrap().head)
-        }
-    }
-
-    impl<T> Iterator for IntoIter<T> {
-        type Item = T;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            self.0.take().map(|node| {
-                self.0 = node.lock().unwrap().next.take().map(|next| {
-                    next.lock().unwrap().prev = None;
-                    next
-                });
-                Arc::into_inner(node).unwrap().into_inner().unwrap().item
-            })
+            IntoIter(self.0.into_inner().unwrap())
         }
     }
 }
