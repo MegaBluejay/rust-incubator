@@ -64,19 +64,13 @@ impl EventNumber {
 }
 
 /// An aggregate version.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum Version {
     /// The version of an aggregate that has not had any events applied to it.
+    #[default]
     Initial,
     /// The version of the last event applied to the aggregate.
     Number(EventNumber),
-}
-
-impl Default for Version {
-    #[inline]
-    fn default() -> Self {
-        Version::Initial
-    }
 }
 
 impl Version {
