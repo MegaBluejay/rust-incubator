@@ -93,71 +93,95 @@ mod list {
 
     pub struct List<T>(Mutex<Ends<T>>);
 
-    impl<T> List<T> {
-        pub fn new() -> Self {
-            List(Mutex::new(Ends {
+    impl<T> Ends<T> {
+        fn new() -> Self {
+            Self {
                 head: None,
                 last: None,
-            }))
+            }
         }
 
-        fn insert_single(this: &mut Ends<T>, new: Neigh<T>) {
-            this.head = new.clone();
-            this.last = new;
+        fn insert_single(&mut self, new: Neigh<T>) {
+            self.head = new.clone();
+            self.last = new;
         }
 
-        fn push<Dir>(&self, item: T)
+        fn push<Dir>(&mut self, item: T)
         where
-            Ends<T>: GetEnds<Dir, Item = T>,
+            Self: GetEnds<Dir, Item = T>,
             Node<T>: GetNeighs<Dir, Item = T>,
         {
-            let mut this = self.0.lock().unwrap();
             let new_last = Node::new(item);
-            if let Some(old_last) = this.last().take() {
+            if let Some(old_last) = self.last().take() {
                 *old_last.lock().unwrap().next() = Some(new_last.clone());
                 *new_last.lock().unwrap().prev() = Some(old_last);
             } else {
-                *this.head() = Some(new_last.clone());
+                *self.head() = Some(new_last.clone());
             }
-            *this.last() = Some(new_last);
+            *self.last() = Some(new_last);
         }
 
-        pub fn push_back(&self, item: T) {
-            self.push::<Forward>(item);
+        fn push_back(&mut self, item: T) {
+            self.push::<Forward>(item)
         }
 
-        pub fn push_front(&self, item: T) {
-            self.push::<Back>(item);
+        fn push_front(&mut self, item: T) {
+            self.push::<Back>(item)
         }
 
-        fn pop<Dir>(&self) -> Option<T>
+        fn pop<Dir>(&mut self) -> Option<T>
         where
-            Ends<T>: GetEnds<Dir, Item = T>,
+            Self: GetEnds<Dir, Item = T>,
             Node<T>: GetNeighs<Dir, Item = T>,
         {
-            let mut this = self.0.lock().unwrap();
-            this.last().take().map(|last| {
-                *this.last() = if let Some(prev) = last.lock().unwrap().prev().take() {
+            self.last().take().map(|last| {
+                *self.last() = if let Some(prev) = last.lock().unwrap().prev().take() {
                     *prev.lock().unwrap().next() = None;
                     Some(prev)
                 } else {
-                    *this.head() = None;
+                    *self.head() = None;
                     None
                 };
                 Arc::into_inner(last).unwrap().into_inner().unwrap().item
             })
         }
 
-        pub fn pop_back(&self) -> Option<T> {
+        fn pop_back(&mut self) -> Option<T> {
             self.pop::<Forward>()
         }
 
-        pub fn pop_front(&self) -> Option<T> {
+        fn pop_front(&mut self) -> Option<T> {
             self.pop::<Back>()
         }
 
+        fn is_empty(&self) -> bool {
+            self.head.is_none()
+        }
+    }
+
+    impl<T> List<T> {
+        pub fn new() -> Self {
+            Self(Mutex::new(Ends::new()))
+        }
+
+        pub fn push_back(&self, item: T) {
+            self.0.lock().unwrap().push_back(item)
+        }
+
+        pub fn push_front(&self, item: T) {
+            self.0.lock().unwrap().push_front(item)
+        }
+
+        pub fn pop_back(&self) -> Option<T> {
+            self.0.lock().unwrap().pop_back()
+        }
+
+        pub fn pop_front(&self) -> Option<T> {
+            self.0.lock().unwrap().pop_front()
+        }
+
         pub fn is_empty(&self) -> bool {
-            self.0.lock().unwrap().head.is_some()
+            self.0.lock().unwrap().is_empty()
         }
     }
 
