@@ -1,5 +1,7 @@
 use std::net::{IpAddr, SocketAddr};
 
+use smart_default::SmartDefault;
+
 fn main() {
     println!("Refactor me!");
 
@@ -7,22 +9,14 @@ fn main() {
     err.status(404).message("User not found".to_string());
 }
 
-#[derive(Debug)]
+#[derive(Debug, SmartDefault)]
 pub struct Error {
+    #[default = "UNKNOWN"]
     code: String,
+    #[default = 500]
     status: u16,
+    #[default = "Unknown error has happened"]
     message: String,
-}
-
-impl Default for Error {
-    #[inline]
-    fn default() -> Self {
-        Self {
-            code: "UNKNOWN".to_string(),
-            status: 500,
-            message: "Unknown error has happened.".to_string(),
-        }
-    }
 }
 
 impl Error {
