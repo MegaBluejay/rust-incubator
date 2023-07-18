@@ -1,25 +1,25 @@
-use std::net::SocketAddr;
+use std::{borrow::Cow, net::SocketAddr};
 
 use default_struct_builder::DefaultBuilder;
 use smart_default::SmartDefault;
 
 fn main() {
     let _err = Error::default()
-        .code("NO_USER".to_string())
+        .code("NO_USER")
         .status(404)
-        .message("User not found".to_string());
+        .message("User not found");
 }
 
 #[derive(Debug, SmartDefault, DefaultBuilder)]
 pub struct Error {
     #[builder(into)]
     #[default = "UNKNOWN"]
-    code: String,
+    code: Cow<'static, str>,
     #[default = 500]
     status: u16,
     #[builder(into)]
     #[default = "Unknown error has happened"]
-    message: String,
+    message: Cow<'static, str>,
 }
 
 #[derive(Debug, Default)]
