@@ -1,11 +1,19 @@
+use std::time::SystemTime;
+
 pub trait EventSourced<Ev: ?Sized> {
     fn apply(&mut self, event: &Ev);
+}
+
+pub trait Activity<T: ?Sized> {
+    fn at(&self) -> &SystemTime;
+
+    fn apply_rest(&self, sourced: &mut T);
 }
 
 pub mod user {
     use std::time::SystemTime;
 
-    use super::{event, EventSourced};
+    use super::{event, Activity, EventSourced};
 
     #[derive(Debug)]
     #[non_exhaustive]
@@ -18,98 +26,115 @@ pub mod user {
         pub deleted_at: Option<DeletionDateTime>,
     }
 
-    impl EventSourced<event::UserCreated> for User {
-        fn apply(&mut self, ev: &event::UserCreated) {
-            let Self {
+    impl<Ev: ?Sized + Activity<User>> EventSourced<Ev> for User {
+        fn apply(&mut self, event: &Ev) {
+            self.last_activity_at = (*event.at()).into();
+            event.apply_rest(self);
+        }
+    }
+
+    impl Activity<User> for event::UserCreated {
+        fn at(&self) -> &SystemTime {
+            &self.at.0
+        }
+
+        fn apply_rest(&self, sourced: &mut User) {
+            let Self { user_id, at } = self;
+            let User {
                 ref mut id,
                 name: _,
                 online_since: _,
                 ref mut created_at,
-                ref mut last_activity_at,
+                last_activity_at: _,
                 deleted_at: _,
-            } = self;
-
-            let event::UserCreated { user_id, at } = ev;
+            } = sourced;
 
             *id = *user_id;
             *created_at = *at;
-            *last_activity_at = (*at).into();
         }
     }
 
-    impl EventSourced<event::UserNameUpdated> for User {
-        fn apply(&mut self, ev: &event::UserNameUpdated) {
+    impl Activity<User> for event::UserNameUpdated {
+        fn at(&self) -> &SystemTime {
+            &self.at
+        }
+
+        fn apply_rest(&self, sourced: &mut User) {
             let Self {
+                user_id: _,
+                name: new_name,
+                at: _,
+            } = self;
+            let User {
                 id: _,
                 ref mut name,
                 online_since: _,
                 created_at: _,
-                ref mut last_activity_at,
+                last_activity_at: _,
                 deleted_at: _,
-            } = self;
-
-            let event::UserNameUpdated {
-                user_id: _,
-                name: new_name,
-                at,
-            } = ev;
+            } = sourced;
 
             *name = new_name.clone();
-            *last_activity_at = (*at).into();
         }
     }
 
-    impl EventSourced<event::UserBecameOnline> for User {
-        fn apply(&mut self, ev: &event::UserBecameOnline) {
-            let Self {
+    impl Activity<User> for event::UserBecameOnline {
+        fn at(&self) -> &SystemTime {
+            &self.at
+        }
+
+        fn apply_rest(&self, sourced: &mut User) {
+            let Self { user_id: _, at } = self;
+            let User {
                 id: _,
                 name: _,
                 ref mut online_since,
                 created_at: _,
-                ref mut last_activity_at,
+                last_activity_at: _,
                 deleted_at: _,
-            } = self;
-
-            let event::UserBecameOnline { user_id: _, at } = ev;
+            } = sourced;
 
             *online_since = Some(*at);
-            *last_activity_at = (*at).into();
         }
     }
 
-    impl EventSourced<event::UserBecameOffline> for User {
-        fn apply(&mut self, ev: &event::UserBecameOffline) {
-            let Self {
+    impl Activity<User> for event::UserBecameOffline {
+        fn at(&self) -> &SystemTime {
+            &self.at
+        }
+
+        fn apply_rest(&self, sourced: &mut User) {
+            let Self { user_id: _, at: _ } = self;
+            let User {
                 id: _,
                 name: _,
                 ref mut online_since,
                 created_at: _,
-                ref mut last_activity_at,
+                last_activity_at: _,
                 deleted_at: _,
-            } = self;
-
-            let event::UserBecameOffline { user_id: _, at } = ev;
+            } = sourced;
 
             *online_since = None;
-            *last_activity_at = (*at).into();
         }
     }
 
-    impl EventSourced<event::UserDeleted> for User {
-        fn apply(&mut self, ev: &event::UserDeleted) {
-            let Self {
+    impl Activity<User> for event::UserDeleted {
+        fn at(&self) -> &SystemTime {
+            &self.at.0
+        }
+
+        fn apply_rest(&self, sourced: &mut User) {
+            let Self { user_id: _, at } = self;
+            let User {
                 id: _,
                 name: _,
                 online_since: _,
                 created_at: _,
-                ref mut last_activity_at,
+                last_activity_at: _,
                 ref mut deleted_at,
-            } = self;
-
-            let event::UserDeleted { user_id: _, at } = ev;
+            } = sourced;
 
             *deleted_at = Some(*at);
-            *last_activity_at = (*at).into();
         }
     }
 
