@@ -1,11 +1,9 @@
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 
 use default_struct_builder::DefaultBuilder;
 use smart_default::SmartDefault;
 
 fn main() {
-    println!("Refactor me!");
-
     let _err = Error::default()
         .code("NO_USER".to_string())
         .status(404)
@@ -28,8 +26,8 @@ pub struct Error {
 pub struct Server(Option<SocketAddr>);
 
 impl Server {
-    pub fn bind(&mut self, ip: IpAddr, port: u16) {
-        self.0 = Some(SocketAddr::new(ip, port))
+    pub fn bind(&mut self, addr: impl Into<SocketAddr>) {
+        self.0 = Some(addr.into())
     }
 }
 
@@ -38,7 +36,7 @@ mod server_spec {
     use super::*;
 
     mod bind {
-        use std::net::Ipv4Addr;
+        use std::net::{IpAddr, Ipv4Addr};
 
         use super::*;
 
@@ -46,11 +44,14 @@ mod server_spec {
         fn sets_provided_address_to_server() {
             let mut server = Server::default();
 
-            server.bind(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+            server.bind((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080));
             assert_eq!(format!("{}", server.0.unwrap()), "127.0.0.1:8080");
 
-            server.bind("::1".parse().unwrap(), 9911);
+            server.bind(("::1".parse::<IpAddr>().unwrap(), 9911));
             assert_eq!(format!("{}", server.0.unwrap()), "[::1]:9911");
+
+            server.bind("127.0.0.1:8081".parse::<SocketAddr>().unwrap());
+            assert_eq!(format!("{}", server.0.unwrap()), "127.0.0.1:8081");
         }
     }
 }
