@@ -9,6 +9,20 @@ use std::fmt;
 use self::format::{Format, FormatWith};
 
 /// Extension trait for an [`Iterator`].
+///
+/// Can't be implemented manually:
+/// ```compile_fail
+/// struct Test;
+/// impl Iterator for Test {
+///     type Item = ();
+///
+///     fn next(&mut self) -> Option<Self::Item> {
+///         unimplemented!()
+///     }
+/// }
+///
+/// impl step_2_6::MyIteratorExt for Test {}
+/// ```
 pub trait MyIteratorExt: Iterator {
     /// Format all iterator elements, separated by `sep`.
     ///
