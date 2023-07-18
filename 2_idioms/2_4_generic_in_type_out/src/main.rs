@@ -1,40 +1,27 @@
 use std::net::{IpAddr, SocketAddr};
 
+use default_struct_builder::DefaultBuilder;
 use smart_default::SmartDefault;
 
 fn main() {
     println!("Refactor me!");
 
-    let mut err = Error::new("NO_USER".to_string());
-    err.status(404).message("User not found".to_string());
+    let _err = Error::default()
+        .code("NO_USER".to_string())
+        .status(404)
+        .message("User not found".to_string());
 }
 
-#[derive(Debug, SmartDefault)]
+#[derive(Debug, SmartDefault, DefaultBuilder)]
 pub struct Error {
+    #[builder(into)]
     #[default = "UNKNOWN"]
     code: String,
     #[default = 500]
     status: u16,
+    #[builder(into)]
     #[default = "Unknown error has happened"]
     message: String,
-}
-
-impl Error {
-    pub fn new(code: String) -> Self {
-        let mut err = Self::default();
-        err.code = code;
-        err
-    }
-
-    pub fn status(&mut self, s: u16) -> &mut Self {
-        self.status = s;
-        self
-    }
-
-    pub fn message(&mut self, m: String) -> &mut Self {
-        self.message = m;
-        self
-    }
 }
 
 #[derive(Debug, Default)]
