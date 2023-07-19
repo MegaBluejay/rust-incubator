@@ -3,3 +3,7 @@ name = "step_2_4"
 version = "0.1.0"
 edition = "2021"
 publish = false
+
+[dependencies]
+default-struct-builder = "0.4.2"
+smart-default = "0.7.1"
