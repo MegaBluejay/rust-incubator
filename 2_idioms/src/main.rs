@@ -1,6 +1,7 @@
 use std::{borrow::Borrow, collections::HashMap, hash::Hash, num::NonZeroU32};
 
 use enum_iterator::{reverse_all, Sequence};
+use thiserror::Error;
 
 #[derive(Debug)]
 struct BaseVendingMachine {
@@ -22,8 +23,11 @@ pub struct Item {
     count: u32,
 }
 
+#[derive(Debug, Error)]
 pub enum VendingError {
+    #[error("no such product")]
     NoSuchProduct,
+    #[error("product not available")]
     ProductNotAvailable,
 }
 
@@ -50,11 +54,15 @@ pub struct Accepting {
 
 pub struct Ready;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Error)]
 pub enum FillError {
+    #[error("product already exists")]
     ProductExists,
+    #[error("too many products")]
     TooManyProducts,
+    #[error("no such product")]
     NoSuchProduct,
+    #[error("too many items")]
     TooManyItems,
 }
 
@@ -204,24 +212,23 @@ impl VendingMachine<Accepting> {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Result;
     use nonzero_ext::nonzero;
 
     use super::*;
 
     #[test]
-    fn max_products() {
+    fn max_products() -> Result<()> {
         let mut base = BaseVendingMachine::new(2, 0);
 
         base.add_product(Product {
             name: "p1".into(),
             price: nonzero!(1u32),
-        })
-        .unwrap()
+        })?
         .add_product(Product {
             name: "p2".into(),
             price: nonzero!(1u32),
-        })
-        .unwrap();
+        })?;
 
         assert_eq!(
             base.add_product(Product {
@@ -231,24 +238,24 @@ mod tests {
             .unwrap_err(),
             FillError::TooManyProducts
         );
+        Ok(())
     }
 
     #[test]
-    fn max_items() {
+    fn max_items() -> Result<()> {
         let mut base = BaseVendingMachine::new(1, 2);
 
         base.add_product(Product {
             name: "p1".into(),
             price: nonzero!(1u32),
-        })
-        .unwrap()
-        .fill_product("p1", 2)
-        .unwrap();
+        })?
+        .fill_product("p1", 2)?;
 
         assert_eq!(
             base.fill_product("p1", 1).unwrap_err(),
             FillError::TooManyItems
         );
+        Ok(())
     }
 
     #[test]
