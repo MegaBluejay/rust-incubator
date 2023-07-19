@@ -176,6 +176,8 @@ impl VendingMachine<Accepting> {
             .accepted
             .checked_sub(self.state.selected.price.get())
         {
+            // since `base` isn't mutated anywhere else,
+            // and `name` isn't mutated at all, it should always be in the map
             self.base
                 .items
                 .get_mut(&self.state.selected.name)
