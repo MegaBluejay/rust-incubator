@@ -24,7 +24,7 @@ pub trait Aggregate: Default {
 }
 
 /// An identifier for an aggregate.
-pub trait AggregateId<A: ?Sized> {
+pub trait AggregateId<A: ?Sized + Aggregate> {
     /// Gets the stringified aggregate identifier.
     fn as_str(&self) -> &str;
 }
@@ -36,7 +36,7 @@ pub trait Event {
 }
 
 /// An event that can be applied to an aggregate.
-pub trait AggregateEvent<A: ?Sized>: Event {
+pub trait AggregateEvent<A: ?Sized + Aggregate>: Event {
     /// Consumes the event, applying its effects to the aggregate.
     fn apply_to(self, aggregate: &mut A);
 }
