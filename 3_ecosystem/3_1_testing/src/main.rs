@@ -71,6 +71,30 @@ mod tests {
         get_secret_number_from(vec!["".to_owned()]);
     }
 
+    #[test]
+    #[should_panic = "not a number"]
+    fn secret_number_not_a_number() {
+        get_secret_number_from(vec!["".to_owned(), "a".to_owned()]);
+    }
+
+    #[test]
+    fn basic_secret_number() {
+        assert_eq!(
+            5,
+            get_secret_number_from(vec!["".to_owned(), "5".to_owned()])
+        );
+    }
+
+    #[test]
+    fn basic_guess_number() {
+        assert_eq!(Some(6), get_guess_number_from("6".as_bytes()));
+    }
+
+    #[test]
+    fn invalid_guess_number() {
+        assert_eq!(None, get_guess_number_from(&[][..]));
+    }
+
     proptest! {
         #[test]
         fn valid_secret_number(
