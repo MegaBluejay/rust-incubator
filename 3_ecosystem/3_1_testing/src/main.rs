@@ -113,13 +113,14 @@ mod tests {
             n: u32,
             before in r"[\s--\n]*",
             after in r"[\s--\n]*",
+            rest: String,
         ) {
-            let input = format!("{}{}{}{}", before, n, after, "\n");
+            let input = format!("{}{}{}{}{}", before, n, after, "\n", rest);
             prop_assert_eq!(Some(n), get_guess_number_from(input.as_bytes()))
         }
 
         #[test]
-        fn guess_number_no_panic(mut input: String) {
+        fn guess_number_no_panic(input: String) {
             let _ = get_guess_number_from(format!("{}{}", input, "\n").as_bytes());
         }
     }
