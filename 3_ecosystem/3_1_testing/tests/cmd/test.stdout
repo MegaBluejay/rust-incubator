@@ -1,0 +1,12 @@
+Guess the number!
+Please input your guess.
+Please input your guess.
+You guessed: 50
+Too big!
+Please input your guess.
+Please input your guess.
+You guessed: 0
+Too small!
+Please input your guess.
+You guessed: 8
+You win!

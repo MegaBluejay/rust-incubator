@@ -6,3 +6,6 @@ publish = false
 
 [dev-dependencies]
 proptest = "1.2.0"
+
+[dependencies]
+trycmd = "0.14.16"
