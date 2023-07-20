@@ -12,6 +12,7 @@ struct BaseVendingMachine {
     coins: EnumMap<Coin, u32>,
 }
 
+#[derive(Debug)]
 pub struct VendingMachine<State: VendingState> {
     base: BaseVendingMachine,
     state: State::State,
@@ -46,11 +47,13 @@ pub enum Coin {
     Fifty = 50,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Product {
     name: Box<str>,
     price: Cost,
 }
 
+#[derive(Debug)]
 pub struct TempState {
     product: Product,
     accepted: u32,
@@ -60,8 +63,13 @@ pub trait VendingState {
     type State;
 }
 
+#[derive(Debug)]
 pub struct Ready;
+
+#[derive(Debug)]
 pub struct Accepting;
+
+#[derive(Debug)]
 pub struct Dispensing;
 
 impl VendingState for Ready {
@@ -217,9 +225,7 @@ impl VendingMachine<Accepting> {
         self.state.accepted
     }
 
-    pub fn accept(mut self, coin: Coin) -> Result<VendingMachine<Dispensing>, Self> {
-        self.state.accepted += coin as u32;
-        self.base.coins[coin] += 1;
+    fn enough(self) -> Result<VendingMachine<Dispensing>, Self> {
         if self
             .state
             .accepted
@@ -233,6 +239,23 @@ impl VendingMachine<Accepting> {
         } else {
             Err(self)
         }
+    }
+
+    pub fn accept(mut self, coin: Coin) -> Result<VendingMachine<Dispensing>, Self> {
+        self.state.accepted += coin as u32;
+        self.base.coins[coin] += 1;
+        self.enough()
+    }
+
+    pub fn accept_many(
+        mut self,
+        coins: impl IntoIterator<Item = Coin>,
+    ) -> Result<VendingMachine<Dispensing>, Self> {
+        for coin in coins {
+            self.state.accepted += coin as u32;
+            self.base.coins[coin] += 1;
+        }
+        self.enough()
     }
 
     pub fn cancel(mut self) -> (Vec<Coin>, VendingMachine<Ready>) {
@@ -318,13 +341,35 @@ mod tests {
         Ok(())
     }
 
-    // #[test]
-    // fn as_coins() {
-    //     assert_eq!(
-    //         VendingMachine::<Accepting>::as_coins(13),
-    //         vec![Coin::Ten, Coin::Two, Coin::One]
-    //     );
-    // }
+    #[test]
+    fn purchase() -> Result<()> {
+        let mut base = BaseVendingMachine::new(1, 1);
+
+        base.add_product(Product {
+            name: "p1".into(),
+            price: nonzero!(3u32),
+        })?
+        .fill_product("p1", 1)?
+        .fill_coins(vec![Coin::One]);
+
+        let machine: VendingMachine<Ready> = base.into();
+        let machine = machine.select("p1").map_err(|(err, _)| err)?;
+        let machine = machine
+            .accept_many(vec![Coin::Two, Coin::Two])
+            .expect("should be enough");
+        let (change, result, _machine) = machine.dispense();
+
+        assert_eq!(change, vec![Coin::One]);
+        assert_eq!(
+            result?,
+            Product {
+                name: "p1".into(),
+                price: nonzero!(3u32),
+            }
+        );
+
+        Ok(())
+    }
 }
 
 fn main() {}
