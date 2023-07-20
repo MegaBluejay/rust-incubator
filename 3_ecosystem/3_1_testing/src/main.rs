@@ -65,9 +65,15 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    #[should_panic = "No secret number"]
+    fn no_secret_number() {
+        get_secret_number_from(vec!["".to_owned()]);
+    }
+
     proptest! {
         #[test]
-        fn secret_number(
+        fn valid_secret_number(
             n: u32,
             before in r"\s*",
             after in r"\s*",
@@ -76,6 +82,21 @@ mod tests {
             let input = format!("{}{}{}", before, n, after);
             args.insert(1, input);
             prop_assert_eq!(n, get_secret_number_from(args));
+        }
+
+        #[test]
+        fn valid_guess_number(
+            n: u32,
+            before in r"[\s--\n]*",
+            after in r"[\s--\n]*",
+        ) {
+            let input = format!("{}{}{}{}", before, n, after, "\n");
+            prop_assert_eq!(Some(n), get_guess_number_from(input.as_bytes()))
+        }
+
+        #[test]
+        fn guess_number_no_panic(mut input: String) {
+            let _ = get_guess_number_from(format!("{}{}", input, "\n").as_bytes());
         }
     }
 }
