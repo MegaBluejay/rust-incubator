@@ -57,3 +57,25 @@ fn get_guess_number_from(mut input: impl BufRead) -> Option<u32> {
     input.read_line(&mut guess).expect("Failed to read line");
     guess.trim().parse().ok()
 }
+
+#[cfg(test)]
+mod tests {
+    use proptest::collection::size_range;
+    use proptest::prelude::*;
+
+    use super::*;
+
+    proptest! {
+        #[test]
+        fn secret_number(
+            n: u32,
+            before in r"\s*",
+            after in r"\s*",
+            mut args in any_with::<Vec<String>>((size_range(1..5), Default::default()))
+        ) {
+            let input = format!("{}{}{}", before, n, after);
+            args.insert(1, input);
+            prop_assert_eq!(n, get_secret_number_from(args));
+        }
+    }
+}
