@@ -1,4 +1,8 @@
-use std::{cmp::Ordering, env, io};
+use std::{
+    cmp::Ordering,
+    env,
+    io::{self, BufRead},
+};
 
 fn main() {
     println!("Guess the number!");
@@ -27,7 +31,12 @@ fn main() {
 }
 
 fn get_secret_number() -> u32 {
-    let secret_number = env::args()
+    get_secret_number_from(env::args())
+}
+
+fn get_secret_number_from(args: impl IntoIterator<Item = String>) -> u32 {
+    let secret_number = args
+        .into_iter()
         .skip(1)
         .take(1)
         .last()
@@ -40,9 +49,11 @@ fn get_secret_number() -> u32 {
 }
 
 fn get_guess_number() -> Option<u32> {
+    get_guess_number_from(io::stdin().lock())
+}
+
+fn get_guess_number_from(mut input: impl BufRead) -> Option<u32> {
     let mut guess = String::new();
-    io::stdin()
-        .read_line(&mut guess)
-        .expect("Failed to read line");
+    input.read_line(&mut guess).expect("Failed to read line");
     guess.trim().parse().ok()
 }
