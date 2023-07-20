@@ -18,11 +18,9 @@ pub struct VendingMachine<State: VendingState> {
     state: State::State,
 }
 
-pub type Cost = NonZeroU32;
-
 #[derive(Debug)]
 pub struct Item {
-    price: Cost,
+    price: NonZeroU32,
     count: u32,
 }
 
@@ -50,7 +48,7 @@ pub enum Coin {
 #[derive(Debug, PartialEq)]
 pub struct Product {
     name: Box<str>,
-    price: Cost,
+    price: NonZeroU32,
 }
 
 #[derive(Debug)]
