@@ -44,7 +44,6 @@ fn get_secret_number_from(args: impl IntoIterator<Item = String>) -> u32 {
     secret_number
         .trim()
         .parse()
-        .ok()
         .expect("Secret number is not a number")
 }
 
