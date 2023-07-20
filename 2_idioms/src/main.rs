@@ -5,7 +5,7 @@ use enum_map::{Enum, EnumMap};
 use thiserror::Error;
 
 #[derive(Debug)]
-struct BaseVendingMachine {
+pub struct BaseVendingMachine {
     items: HashMap<Box<str>, Item>,
     max_products: usize,
     max_item_count: u32,
@@ -213,6 +213,10 @@ impl VendingMachine<Ready> {
         } else {
             Err((VendingError::NoSuchProduct, self))
         }
+    }
+
+    pub fn into_base(self) -> BaseVendingMachine {
+        self.base
     }
 }
 
