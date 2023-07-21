@@ -1093,10 +1093,18 @@ version = "0.1.0"
 [[package]]
 name = "step_3_2"
 version = "0.1.0"
+dependencies = [
+ "step_3_2_proc",
+]
 
 [[package]]
 name = "step_3_2_proc"
 version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "step_3_3"

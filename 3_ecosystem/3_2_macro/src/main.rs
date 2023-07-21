@@ -1,19 +1,18 @@
-use std::collections::BTreeMap;
-
 macro_rules! btreemap {
     ($($key:expr => $val:expr),*) => {
         {
             #[allow(unused_mut)]
-            let mut m = BTreeMap::new();
+            let mut __map = ::std::collections::BTreeMap::new();
             $(
-                m.insert($key, $val);
+                __map.insert($key, $val);
             )*
-            m
+            __map
         }
     };
 }
 
 fn main() {
-    let m = btreemap!["a".to_owned() => 2, "b".to_owned() => 4];
-    println!("{:?}", m);
+    let m1 = btreemap!["a".to_owned() => 1, "b".to_owned() => 2];
+    let m2 = step_3_2_proc::btreemap!["a" => 3, "b" => 2 + 2];
+    println!("{:?}, {:?}", m1, m2);
 }
