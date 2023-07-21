@@ -1,13 +1,21 @@
 use std::num::TryFromIntError;
 
 use thiserror::Error;
-use time::{error::ComponentRange, Date};
+use time::{error::ComponentRange, macros::datetime, Date, OffsetDateTime};
 
 fn main() {
     println!("Implement me!");
 }
 
-const NOW: &str = "2019-06-26";
+#[cfg(not(test))]
+fn now() -> OffsetDateTime {
+    OffsetDateTime::now_utc()
+}
+
+#[cfg(test)]
+fn now() -> OffsetDateTime {
+    datetime!(2019-06-26 12:00 UTC)
+}
 
 struct User {
     birthday: Date,
@@ -34,12 +42,21 @@ impl User {
 
     /// Returns current age of [`User`] in years.
     fn age(&self) -> u16 {
-        unimplemented!()
+        let today = now().date();
+        let mut years = today.year() - self.birthday.year();
+        if today.ordinal() < self.birthday.ordinal() {
+            years -= 1;
+        }
+        if years > 0 {
+            years.try_into().unwrap()
+        } else {
+            0
+        }
     }
 
     /// Checks if [`User`] is 18 years old at the moment.
     fn is_adult(&self) -> bool {
-        unimplemented!()
+        self.age() >= 18
     }
 }
 
