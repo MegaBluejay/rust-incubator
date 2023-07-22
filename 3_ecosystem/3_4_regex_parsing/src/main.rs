@@ -24,10 +24,32 @@ impl Parser for RegexParser {
     fn parse(input: &str) -> Parsed {
         static RE: Lazy<Regex> = Lazy::new(|| {
             Regex::new(
-                r"^(?:.?[<^>])?(?P<sign>[+-])?#?0?(?P<width>[1-9]\d*)?(?:\.(?:(?P<precision_ast>\*)|(?P<precision_int>[1-9]\d*)|(?P<precision_arg>[1-9]\d*)\$))?(?:\?|x\?|X\?|(?:\p{XID_Start}|_)\p{XID_Continue}*)?$",
+                r"(?x)
+                ^
+                (?:.?[<^>])? # [[fill]align]
+                (?P<sign>[+-])?
+                \#?
+                0?
+                (?P<width>[1-9]\d*)?
+                (?:
+                    \.
+                    (?:
+                        (?P<precision_ast>\*)
+                        | (?P<precision_int>[1-9]\d*)
+                        | (?P<precision_arg>[1-9]\d*)\$
+                    )
+                )?
+                (?:
+                    \?
+                    | x\?
+                    | X\?
+                    | (?:\p{XID_Start}|_)\p{XID_Continue}*
+                )?
+                $",
             )
             .unwrap()
         });
+
         let caps = RE.captures(input).unwrap();
 
         let sign = caps.name("sign").map(|sign| {
