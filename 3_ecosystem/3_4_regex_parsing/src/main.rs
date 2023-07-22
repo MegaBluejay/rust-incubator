@@ -2,7 +2,7 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{alpha1, alphanumeric1, anychar, char, digit0, one_of},
-    combinator::{all_consuming, eof, map, map_res, opt, recognize, value},
+    combinator::{all_consuming, map, map_res, opt, recognize, value},
     multi::many0_count,
     sequence::{pair, preceded, terminated},
     IResult,
@@ -12,14 +12,16 @@ use regex::Regex;
 
 fn main() {}
 
+type Parsed = (Option<Sign>, Option<usize>, Option<Precision>);
+
 trait Parser {
-    fn parse(input: &str) -> (Option<Sign>, Option<usize>, Option<Precision>);
+    fn parse(input: &str) -> Parsed;
 }
 
 struct RegexParser;
 
 impl Parser for RegexParser {
-    fn parse(input: &str) -> (Option<Sign>, Option<usize>, Option<Precision>) {
+    fn parse(input: &str) -> Parsed {
         static RE: Lazy<Regex> = Lazy::new(|| {
             Regex::new(
                 r"^(?:.?[<^>])?(?P<sign>[+-])?#?0?(?P<width>[1-9]\d*)?(?:\.(?:(?P<precision_ast>\*)|(?P<precision_int>[1-9]\d*)|(?P<precision_arg>[1-9]\d*)\$))?(?:\?|x\?|X\?|(?:\p{XID_Start}|_)\p{XID_Continue}*)?$",
@@ -87,7 +89,7 @@ fn align(input: &str) -> IResult<&str, char> {
     one_of("<^>")(input)
 }
 
-fn format_spec(input: &str) -> IResult<&str, (Option<Sign>, Option<usize>, Option<Precision>)> {
+fn format_spec(input: &str) -> IResult<&str, Parsed> {
     let (input, _) = opt(alt((preceded(anychar, align), align)))(input)?;
     dbg!(input);
     let (input, sign) = opt(sign)(input)?;
@@ -106,7 +108,7 @@ fn format_spec(input: &str) -> IResult<&str, (Option<Sign>, Option<usize>, Optio
 }
 
 impl Parser for NomParser {
-    fn parse(input: &str) -> (Option<Sign>, Option<usize>, Option<Precision>) {
+    fn parse(input: &str) -> Parsed {
         all_consuming(format_spec)(input).unwrap().1
     }
 }
