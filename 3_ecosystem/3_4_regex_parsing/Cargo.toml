@@ -3,3 +3,6 @@ name = "step_3_4"
 version = "0.1.0"
 edition = "2021"
 publish = false
+
+[dependencies]
+generic-tests = "0.1.2"

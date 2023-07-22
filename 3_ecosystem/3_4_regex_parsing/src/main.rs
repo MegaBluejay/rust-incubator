@@ -2,8 +2,16 @@ fn main() {
     println!("Implement me!");
 }
 
-fn parse(input: &str) -> (Option<Sign>, Option<usize>, Option<Precision>) {
-    unimplemented!()
+trait Parser {
+    fn parse(input: &str) -> (Option<Sign>, Option<usize>, Option<Precision>);
+}
+
+struct RegexParser;
+
+impl Parser for RegexParser {
+    fn parse(input: &str) -> (Option<Sign>, Option<usize>, Option<Precision>) {
+        todo!()
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -20,11 +28,12 @@ enum Precision {
 }
 
 #[cfg(test)]
+#[generic_tests::define]
 mod spec {
     use super::*;
 
     #[test]
-    fn parses_sign() {
+    fn parses_sign<P: Parser>() {
         for (input, expected) in vec![
             ("", None),
             (">8.*", None),
@@ -32,13 +41,13 @@ mod spec {
             ("-.1$x", Some(Sign::Minus)),
             ("a^#043.8?", None),
         ] {
-            let (sign, ..) = parse(input);
+            let (sign, ..) = <P>::parse(input);
             assert_eq!(sign, expected);
         }
     }
 
     #[test]
-    fn parses_width() {
+    fn parses_width<P: Parser>() {
         for (input, expected) in vec![
             ("", None),
             (">8.*", Some(8)),
@@ -46,13 +55,13 @@ mod spec {
             ("-.1$x", None),
             ("a^#043.8?", Some(43)),
         ] {
-            let (_, width, _) = parse(input);
+            let (_, width, _) = <P>::parse(input);
             assert_eq!(width, expected);
         }
     }
 
     #[test]
-    fn parses_precision() {
+    fn parses_precision<P: Parser>() {
         for (input, expected) in vec![
             ("", None),
             (">8.*", Some(Precision::Asterisk)),
@@ -60,8 +69,11 @@ mod spec {
             ("-.1$x", Some(Precision::Argument(1))),
             ("a^#043.8?", Some(Precision::Integer(8))),
         ] {
-            let (_, _, precision) = parse(input);
+            let (_, _, precision) = <P>::parse(input);
             assert_eq!(precision, expected);
         }
     }
+
+    #[instantiate_tests(<RegexParser>)]
+    mod regex {}
 }
