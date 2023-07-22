@@ -1,7 +1,7 @@
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{alpha1, alphanumeric1, anychar, char, digit0, one_of},
+    character::complete::{anychar, char, digit0, one_of, satisfy},
     combinator::{all_consuming, map, map_res, opt, recognize, value},
     multi::many0_count,
     sequence::{pair, preceded, terminated},
@@ -9,6 +9,7 @@ use nom::{
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
+use unic_ucd_ident::{is_xid_continue, is_xid_start};
 
 fn main() {}
 
@@ -102,8 +103,8 @@ fn precision(input: &str) -> IResult<&str, Precision> {
 
 fn ident(input: &str) -> IResult<&str, &str> {
     recognize(pair(
-        alt((alpha1, tag("_"))),
-        many0_count(alt((alphanumeric1, tag("_")))),
+        alt((satisfy(is_xid_start), char('_'))),
+        many0_count(satisfy(is_xid_continue)),
     ))(input)
 }
 
