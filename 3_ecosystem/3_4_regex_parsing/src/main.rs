@@ -91,19 +91,12 @@ fn align(input: &str) -> IResult<&str, char> {
 
 fn format_spec(input: &str) -> IResult<&str, Parsed> {
     let (input, _) = opt(alt((preceded(anychar, align), align)))(input)?;
-    dbg!(input);
     let (input, sign) = opt(sign)(input)?;
-    dbg!(input);
     let (input, _) = opt(char('#'))(input)?;
-    dbg!(input);
     let (input, _) = opt(char('0'))(input)?;
-    dbg!(input);
     let (input, width) = opt(integer)(input)?;
-    dbg!(input);
     let (input, precision) = opt(preceded(char('.'), precision))(input)?;
-    dbg!(input);
     let (input, _) = opt(alt((tag("?"), tag("x?"), tag("X?"), ident)))(input)?;
-    dbg!(input);
     Ok((input, (sign, width, precision)))
 }
 
