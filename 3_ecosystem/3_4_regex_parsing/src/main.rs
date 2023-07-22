@@ -1,3 +1,6 @@
+use once_cell::sync::Lazy;
+use regex::Regex;
+
 fn main() {
     println!("Implement me!");
 }
@@ -10,7 +13,38 @@ struct RegexParser;
 
 impl Parser for RegexParser {
     fn parse(input: &str) -> (Option<Sign>, Option<usize>, Option<Precision>) {
-        todo!()
+        static RE: Lazy<Regex> = Lazy::new(|| {
+            Regex::new(
+                r"^(?:.?[<^>])?(?P<sign>[+-])?#?0?(?P<width>[1-9]\d*)?(?:\.(?:(?P<precision_ast>\*)|(?P<precision_int>[1-9]\d*)|(?P<precision_arg>[1-9]\d*)\$))?(?:\?|x\?|X\?|(?:\p{XID_Start}|_)\p{XID_Continue}*)?$",
+            )
+            .unwrap()
+        });
+        let caps = RE.captures(input).unwrap();
+
+        let sign = caps.name("sign").map(|sign| {
+            if sign.as_str() == "+" {
+                Sign::Plus
+            } else {
+                Sign::Minus
+            }
+        });
+
+        let width = caps
+            .name("width")
+            .map(|width| width.as_str().parse().unwrap());
+
+        #[allow(clippy::manual_map)]
+        let precision = if caps.name("precision_ast").is_some() {
+            Some(Precision::Asterisk)
+        } else if let Some(precision_int) = caps.name("precision_int") {
+            Some(Precision::Integer(precision_int.as_str().parse().unwrap()))
+        } else if let Some(precision_arg) = caps.name("precision_arg") {
+            Some(Precision::Argument(precision_arg.as_str().parse().unwrap()))
+        } else {
+            None
+        };
+
+        (sign, width, precision)
     }
 }
 
@@ -34,7 +68,7 @@ mod spec {
 
     #[test]
     fn parses_sign<P: Parser>() {
-        for (input, expected) in vec![
+        for (input, expected) in [
             ("", None),
             (">8.*", None),
             (">+8.*", Some(Sign::Plus)),
@@ -48,7 +82,7 @@ mod spec {
 
     #[test]
     fn parses_width<P: Parser>() {
-        for (input, expected) in vec![
+        for (input, expected) in [
             ("", None),
             (">8.*", Some(8)),
             (">+8.*", Some(8)),
@@ -62,7 +96,7 @@ mod spec {
 
     #[test]
     fn parses_precision<P: Parser>() {
-        for (input, expected) in vec![
+        for (input, expected) in [
             ("", None),
             (">8.*", Some(Precision::Asterisk)),
             (">+8.*", Some(Precision::Asterisk)),

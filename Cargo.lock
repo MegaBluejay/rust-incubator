@@ -1130,6 +1130,8 @@ name = "step_3_4"
 version = "0.1.0"
 dependencies = [
  "generic-tests",
+ "once_cell",
+ "regex",
 ]
 
 [[package]]

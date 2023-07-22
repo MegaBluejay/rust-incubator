@@ -6,3 +6,5 @@ publish = false
 
 [dependencies]
 generic-tests = "0.1.2"
+once_cell = "1.18.0"
+regex = "1.9.1"
