@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -22,51 +23,57 @@ fn main() -> Result<(), anyhow::Error> {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
-enum Request {
+enum Request<'a> {
     Success {
-        stream: Stream,
-        gifts: Vec<Gift>,
+        #[serde(borrow)]
+        stream: Stream<'a>,
+        #[serde(borrow)]
+        gifts: Vec<Gift<'a>>,
         debug: DebugInfo,
     },
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct Stream {
+struct Stream<'a> {
     user_id: Uuid,
     is_private: bool,
     settings: u32,
     shard_url: Url,
-    public_tariff: PublicTariff,
-    private_tariff: PrivateTariff,
+    #[serde(borrow)]
+    public_tariff: PublicTariff<'a>,
+    #[serde(borrow)]
+    private_tariff: PrivateTariff<'a>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct PublicTariff {
-    #[serde(flatten)]
-    base: BaseTariff,
+struct PublicTariff<'a> {
+    #[serde(flatten, borrow)]
+    base: BaseTariff<'a>,
     id: u32,
     price: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct PrivateTariff {
-    #[serde(flatten)]
-    base: BaseTariff,
+struct PrivateTariff<'a> {
+    #[serde(flatten, borrow)]
+    base: BaseTariff<'a>,
     client_price: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct BaseTariff {
+struct BaseTariff<'a> {
     #[serde(with = "humantime_serde")]
     duration: Duration,
-    description: String,
+    #[serde(borrow)]
+    description: Cow<'a, str>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct Gift {
+struct Gift<'a> {
     id: u32,
     price: u32,
-    description: String,
+    #[serde(borrow)]
+    description: Cow<'a, str>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -84,6 +91,16 @@ mod tests {
 
     use super::*;
 
+    macro_rules! check_borrowed {
+        ($($cow:expr),+ $(,)?) => {
+            $(
+                if let Cow::Owned(_) = $cow {
+                    panic!("{} is owned", stringify!($cow));
+                }
+            )+
+        };
+    }
+
     #[test]
     fn request() -> Result<(), anyhow::Error> {
         let request: Request = serde_json::from_slice(INPUT)?;
@@ -96,7 +113,7 @@ mod tests {
                 public_tariff: PublicTariff {
                     base: BaseTariff {
                         duration: Duration::from_secs(60 * 60),
-                        description: "test public tariff".to_owned(),
+                        description: "test public tariff".into(),
                     },
                     id: 1,
                     price: 100,
@@ -104,7 +121,7 @@ mod tests {
                 private_tariff: PrivateTariff {
                     base: BaseTariff {
                         duration: Duration::from_secs(60),
-                        description: "test private tariff".to_owned(),
+                        description: "test private tariff".into(),
                     },
                     client_price: 250,
                 },
@@ -113,12 +130,12 @@ mod tests {
                 Gift {
                     id: 1,
                     price: 2,
-                    description: "Gift 1".to_owned(),
+                    description: "Gift 1".into(),
                 },
                 Gift {
                     id: 2,
                     price: 3,
-                    description: "Gift 2".to_owned(),
+                    description: "Gift 2".into(),
                 },
             ],
             debug: DebugInfo {
@@ -126,7 +143,22 @@ mod tests {
                 at: datetime!(2019-06-28 08:35:46 UTC),
             },
         };
+
         assert_eq!(request, expected);
+
+        let Request::Success {
+            stream,
+            gifts,
+            debug: _,
+        } = request;
+
+        check_borrowed!(
+            stream.public_tariff.base.description,
+            stream.private_tariff.base.description,
+            gifts[0].description,
+            gifts[1].description,
+        );
+
         Ok(())
     }
 }
