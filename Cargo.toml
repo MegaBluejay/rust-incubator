@@ -6,6 +6,7 @@ members = [
     "2_idioms/2_*",
     "3_ecosystem",
     "3_ecosystem/3_*",
+    "3_ecosystem/3_2_macro/proc",
     "4_backend",
     "4_backend/4_*",
 ]
