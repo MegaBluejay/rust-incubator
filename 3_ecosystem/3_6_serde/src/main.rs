@@ -21,18 +21,13 @@ fn main() -> Result<(), anyhow::Error> {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct Request {
-    #[serde(rename = "type")]
-    req_type: ReqType,
-    stream: Stream,
-    gifts: Vec<Gift>,
-    debug: DebugInfo,
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-enum ReqType {
-    Success,
+#[serde(tag = "type", rename_all = "snake_case")]
+enum Request {
+    Success {
+        stream: Stream,
+        gifts: Vec<Gift>,
+        debug: DebugInfo,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -92,8 +87,7 @@ mod tests {
     #[test]
     fn request() -> Result<(), anyhow::Error> {
         let request: Request = serde_json::from_slice(INPUT)?;
-        let expected = Request {
-            req_type: ReqType::Success,
+        let expected = Request::Success {
             stream: Stream {
                 user_id: uuid!("8d234120-0bda-49b2-b7e0-fbd3912f6cbf"),
                 is_private: false,
