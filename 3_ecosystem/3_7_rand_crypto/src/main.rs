@@ -22,8 +22,8 @@ fn generate_password(len: usize, symbols: impl AsRef<[char]>) -> String {
     pass
 }
 
-fn select_rand_val<T>(vals: &[T]) -> &T {
-    vals.choose(&mut thread_rng()).unwrap()
+fn select_rand_val<T>(vals: &[T]) -> Option<&T> {
+    vals.choose(&mut thread_rng())
 }
 
 fn new_access_token() -> String {
