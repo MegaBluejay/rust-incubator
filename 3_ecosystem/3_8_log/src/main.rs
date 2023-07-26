@@ -65,8 +65,7 @@ where
 
         let out_str = str::from_utf8(&out).map_err(|_| fmt::Error)?;
 
-        writer.write_str(out_str)?;
-        writeln!(writer)
+        writeln!(writer, "{}", out_str)
     }
 }
 
