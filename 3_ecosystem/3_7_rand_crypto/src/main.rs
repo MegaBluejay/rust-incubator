@@ -1,4 +1,4 @@
-use std::{fs::read, path::Path};
+use std::{collections::HashSet, fs::read, path::Path};
 
 use argon2::{
     password_hash::{PasswordHashString, SaltString},
@@ -14,7 +14,9 @@ use rand::{
 use sha3::{Digest, Sha3_256};
 
 fn generate_password(len: usize, symbols: impl AsRef<[char]>) -> String {
-    let dist = Slice::new(symbols.as_ref()).unwrap();
+    let symbols = symbols.as_ref();
+    debug_assert_eq!(symbols.iter().collect::<HashSet<_>>().len(), symbols.len());
+    let dist = Slice::new(symbols).unwrap();
     let mut pass = String::with_capacity(len);
     pass.extend(dist.sample_iter(&mut thread_rng()).take(len));
     pass
