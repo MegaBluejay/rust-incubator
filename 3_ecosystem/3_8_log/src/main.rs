@@ -2,10 +2,10 @@ use std::{fmt, fs::OpenOptions, io, str};
 
 use serde::{ser::SerializeMap, Serializer};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
-use tracing::{event, metadata::LevelFilter, Event, Level, Subscriber};
+use tracing::{event, Event, Level, Subscriber};
 use tracing_serde::AsSerde;
 use tracing_subscriber::{
-    fmt::{format::Writer, FmtContext, FormatEvent, FormatFields},
+    fmt::{format::Writer, writer::Tee, FmtContext, FormatEvent, FormatFields},
     prelude::*,
     registry::LookupSpan,
 };
@@ -56,15 +56,10 @@ where
 }
 
 fn main() {
-    let out_layer = tracing_subscriber::fmt::layer().event_format(TheJsonFormat);
-    let err_layer = tracing_subscriber::fmt::layer()
-        .with_writer(io::stderr)
+    tracing_subscriber::fmt()
+        .with_writer(Tee::new(io::stdout, io::stderr.with_min_level(Level::WARN)))
         .event_format(TheJsonFormat)
-        .with_filter(LevelFilter::WARN);
-
-    tracing_subscriber::registry()
-        .with(out_layer)
-        .with(err_layer)
+        .finish()
         .init();
 
     event!(Level::INFO, msg = "info", a = 1);
