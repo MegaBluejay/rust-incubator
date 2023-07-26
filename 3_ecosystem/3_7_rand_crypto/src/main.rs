@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fs::read, path::Path};
+use std::{collections::HashSet, fs::read, io, path::Path};
 
 use argon2::{
     password_hash::{PasswordHashString, SaltString},
@@ -29,8 +29,10 @@ fn new_access_token() -> String {
     Alphanumeric.sample_string(&mut thread_rng(), 64)
 }
 
-fn get_file_hash(path: impl AsRef<Path>) -> String {
-    hex::encode(<Sha3_256 as Digest>::digest(read(path.as_ref()).unwrap()))
+fn get_file_hash(path: impl AsRef<Path>) -> io::Result<String> {
+    Ok(hex::encode(<Sha3_256 as Digest>::digest(read(
+        path.as_ref(),
+    )?)))
 }
 
 fn hash_password(password: impl AsRef<str>) -> PasswordHashString {
@@ -49,7 +51,7 @@ fn main() {
 
     dbg!(new_access_token());
 
-    dbg!(get_file_hash("README.md"));
+    dbg!(get_file_hash("README.md").unwrap());
 
     dbg!(hash_password("password"));
 }
