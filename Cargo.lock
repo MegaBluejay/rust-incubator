@@ -287,6 +287,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dairy"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33895b00c1f57002ca5c410fbfef6e30263fa6df253e57bfbf867fcecdaa3d3f"
+
+[[package]]
 name = "darling"
 version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1478,6 +1484,7 @@ dependencies = [
 name = "step_3_8"
 version = "0.1.0"
 dependencies = [
+ "dairy",
  "serde",
  "serde_json",
  "time",

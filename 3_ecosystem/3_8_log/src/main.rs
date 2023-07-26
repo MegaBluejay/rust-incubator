@@ -1,5 +1,6 @@
-use std::{fmt, fs::OpenOptions, io, str};
+use std::{fmt, fs::OpenOptions, io, path::Path, str};
 
+use dairy::Cow;
 use serde::{ser::SerializeMap, Serializer};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use tracing::{event, Event, Level, Subscriber};
@@ -10,12 +11,26 @@ use tracing_subscriber::{
     registry::LookupSpan,
 };
 
-struct TheJsonFormat;
+struct TheJsonFormat<'a> {
+    file: Cow<'a, Path>,
+}
 
-fn serialize_event<S: Serializer>(ser: S, event: &Event, time_str: &str) -> Result<(), S::Error> {
+impl<'a> TheJsonFormat<'a> {
+    fn new(file: impl Into<Cow<'a, Path>>) -> Self {
+        Self { file: file.into() }
+    }
+}
+
+fn serialize_event<S: Serializer>(
+    ser: S,
+    event: &Event,
+    time_str: &str,
+    file: &Path,
+) -> Result<(), S::Error> {
     let mut ser_map = ser.serialize_map(None)?;
 
     ser_map.serialize_entry("time", time_str)?;
+    ser_map.serialize_entry("file", file)?;
 
     let meta = event.metadata();
     ser_map.serialize_entry("lvl", &meta.level().as_serde())?;
@@ -29,7 +44,7 @@ fn serialize_event<S: Serializer>(ser: S, event: &Event, time_str: &str) -> Resu
     Ok(())
 }
 
-impl<S, N> FormatEvent<S, N> for TheJsonFormat
+impl<'a, S, N> FormatEvent<S, N> for TheJsonFormat<'a>
 where
     S: Subscriber + for<'lookup> LookupSpan<'lookup>,
     N: for<'writer> FormatFields<'writer> + 'static,
@@ -46,7 +61,7 @@ where
 
         let mut out: Vec<u8> = vec![];
         let mut ser = serde_json::Serializer::new(&mut out);
-        serialize_event(&mut ser, event, &time_str).map_err(|_| fmt::Error)?;
+        serialize_event(&mut ser, event, &time_str, &self.file).map_err(|_| fmt::Error)?;
 
         let out_str = str::from_utf8(&out).map_err(|_| fmt::Error)?;
 
@@ -58,7 +73,7 @@ where
 fn main() {
     tracing_subscriber::fmt()
         .with_writer(Tee::new(io::stdout, io::stderr.with_min_level(Level::WARN)))
-        .event_format(TheJsonFormat)
+        .event_format(TheJsonFormat::new("app.log"))
         .finish()
         .init();
 
@@ -67,7 +82,7 @@ fn main() {
 
     tracing::subscriber::with_default(
         tracing_subscriber::fmt()
-            .event_format(TheJsonFormat)
+            .event_format(TheJsonFormat::new("access.log"))
             .with_writer(
                 OpenOptions::new()
                     .create(true)
