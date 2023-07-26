@@ -7,7 +7,6 @@ use argon2::{
 use rand::{
     distributions::{Alphanumeric, DistString, Slice},
     prelude::Distribution,
-    rngs::OsRng,
     seq::SliceRandom,
     thread_rng,
 };
@@ -35,7 +34,7 @@ fn get_file_hash(path: impl AsRef<Path>) -> String {
 }
 
 fn hash_password(password: impl AsRef<str>) -> PasswordHashString {
-    let salt = SaltString::generate(&mut OsRng);
+    let salt = SaltString::generate(&mut thread_rng());
     let argon2 = Argon2::default();
     argon2
         .hash_password(password.as_ref().as_bytes(), &salt)
