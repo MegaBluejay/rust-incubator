@@ -1,5 +1,4 @@
-use core::fmt;
-use std::{fs::OpenOptions, io, str};
+use std::{fmt, fs::OpenOptions, io, str};
 
 use serde::{ser::SerializeMap, Serializer};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
@@ -13,6 +12,23 @@ use tracing_subscriber::{
 
 struct TheJsonFormat;
 
+fn serialize_event<S: Serializer>(ser: S, event: &Event, time_str: &str) -> Result<(), S::Error> {
+    let mut ser_map = ser.serialize_map(None)?;
+
+    ser_map.serialize_entry("time", time_str)?;
+
+    let meta = event.metadata();
+    ser_map.serialize_entry("lvl", &meta.level().as_serde())?;
+
+    let mut visitor = tracing_serde::SerdeMapVisitor::new(ser_map);
+    event.record(&mut visitor);
+    ser_map = visitor.take_serializer()?;
+
+    ser_map.end()?;
+
+    Ok(())
+}
+
 impl<S, N> FormatEvent<S, N> for TheJsonFormat
 where
     S: Subscriber + for<'lookup> LookupSpan<'lookup>,
@@ -23,29 +39,18 @@ where
         _ctx: &FmtContext<'_, S, N>,
         mut writer: Writer<'_>,
         event: &Event<'_>,
-    ) -> std::fmt::Result {
-        let timestamp = OffsetDateTime::now_utc().format(&Rfc3339).unwrap();
-        let meta = event.metadata();
+    ) -> fmt::Result {
+        let time_str = OffsetDateTime::now_utc()
+            .format(&Rfc3339)
+            .map_err(|_| fmt::Error)?;
 
-        let do_ser = || {
-            let mut out: Vec<u8> = vec![];
-            let mut ser = serde_json::Serializer::new(&mut out);
-            let mut ser = ser.serialize_map(None)?;
+        let mut out: Vec<u8> = vec![];
+        let mut ser = serde_json::Serializer::new(&mut out);
+        serialize_event(&mut ser, event, &time_str).map_err(|_| fmt::Error)?;
 
-            ser.serialize_entry("time", &timestamp)?;
-            ser.serialize_entry("lvl", &meta.level().as_serde())?;
+        let out_str = str::from_utf8(&out).map_err(|_| fmt::Error)?;
 
-            let mut visitor = tracing_serde::SerdeMapVisitor::new(ser);
-            event.record(&mut visitor);
-            ser = visitor.take_serializer()?;
-
-            ser.end()?;
-            Ok(out)
-        };
-        let out = do_ser().map_err(
-            |_: <&mut serde_json::Serializer<&mut Vec<u8>> as Serializer>::Error| fmt::Error,
-        )?;
-        writer.write_str(str::from_utf8(&out).map_err(|_| fmt::Error)?)?;
+        writer.write_str(out_str)?;
         writeln!(writer)
     }
 }
