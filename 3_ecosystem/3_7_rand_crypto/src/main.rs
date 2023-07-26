@@ -1,6 +1,9 @@
 use std::{fs::read, path::Path};
 
-use argon2::{password_hash::SaltString, Argon2, PasswordHasher};
+use argon2::{
+    password_hash::{PasswordHashString, SaltString},
+    Argon2, PasswordHasher,
+};
 use rand::{
     distributions::{Alphanumeric, DistString, Slice},
     prelude::Distribution,
@@ -29,13 +32,13 @@ fn get_file_hash(path: impl AsRef<Path>) -> String {
     hex::encode(<Sha3_256 as Digest>::digest(read(path.as_ref()).unwrap()))
 }
 
-fn hash_password(password: impl AsRef<str>) -> String {
+fn hash_password(password: impl AsRef<str>) -> PasswordHashString {
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
     argon2
         .hash_password(password.as_ref().as_bytes(), &salt)
         .unwrap()
-        .to_string()
+        .into()
 }
 
 fn main() {
