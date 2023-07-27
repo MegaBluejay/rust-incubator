@@ -1,67 +1,12 @@
-use std::{
-    net::{IpAddr, Ipv4Addr},
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::{net::Ipv4Addr, path::Path, time::Duration};
 
-use clap::{
-    builder::styling::{Style, Styles},
-    ArgAction, Args, Parser,
-};
-use config::{Config, ConfigError, FileFormat};
-use indoc::indoc;
+use clap::Parser;
+use config::{Config, ConfigError};
 use serde::Deserialize;
 use smart_default::SmartDefault;
 use url::Url;
 
-#[derive(Debug, Args)]
-struct Flags {
-    /// Enables debug mode
-    #[arg(short, long)]
-    debug: bool,
-    /// Prints help information
-    #[arg(short, long, action = ArgAction::Help)]
-    help: (),
-    /// Prints version information
-    #[arg(short = 'V', long, action = ArgAction::Version)]
-    version: (),
-}
-
-#[derive(Debug, Args)]
-struct Options {
-    /// Path to configuration file
-    #[arg(
-        short,
-        long,
-        id = "conf",
-        env = "CONF_FILE",
-        default_value = "config.toml"
-    )]
-    conf: PathBuf,
-}
-
-/// Prints its configuration to STDOUT
-#[derive(Debug, Parser)]
-#[command(
-    disable_help_flag = true,
-    disable_version_flag = true,
-    styles = Styles::default().header(Style::new()),
-    version = "0.1.0",
-    override_usage = "step_3_9 [FLAGS] [OPTIONS]",
-    help_template = indoc! {"
-    {about-section}
-    USAGE:
-        {usage}
-
-    {all-args}
-    "}
-)]
-struct Cli {
-    #[command(flatten, next_help_heading = "FLAGS")]
-    flags: Flags,
-    #[command(flatten, next_help_heading = "OPTIONS")]
-    options: Options,
-}
+mod cli;
 
 #[derive(Debug, Deserialize, Default)]
 #[serde(default)]
@@ -176,7 +121,7 @@ impl TheConfig {
 }
 
 fn main() {
-    let cli = Cli::parse();
+    let cli = cli::Cli::parse();
     let conf = TheConfig::new(&cli.options.conf);
     println!("{conf:#?}");
 }
