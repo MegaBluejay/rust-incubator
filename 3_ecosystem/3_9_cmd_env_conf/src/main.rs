@@ -1,3 +1,10 @@
+use clap::Parser;
+
+mod cli;
+mod config;
+
 fn main() {
-    println!("Implement me!");
+    let cli = cli::Cli::parse();
+    let conf = config::TheConfig::new(&cli.options.conf);
+    println!("{conf:#?}");
 }
