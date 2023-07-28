@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use clap::Parser;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use filenamify::filenamify;
 use futures::TryStreamExt;
 use tokio::{
@@ -37,16 +37,21 @@ fn main() -> Result<()> {
 async fn async_main(path: &Path) -> Result<()> {
     let client = reqwest::Client::new();
 
-    let file = File::open(path).await?;
+    let file = File::open(path).await.context("couldn't open urls file")?;
     let mut lines = BufReader::new(file).lines();
 
     let mut join_set = JoinSet::new();
 
-    while let Some(line) = lines.next_line().await? {
+    while let Some(line) = lines
+        .next_line()
+        .await
+        .context("failed to read from urls file")?
+    {
         let task_client = client.clone();
         join_set.spawn(async move {
-            if let Err(err) = handle(task_client, line).await {
-                eprintln!("{err}");
+            match handle(task_client, &line).await {
+                Ok(_) => eprintln!("{line} OK"),
+                Err(err) => eprintln!("{line} {err}"),
             }
         });
     }
@@ -58,18 +63,23 @@ async fn async_main(path: &Path) -> Result<()> {
     Ok(())
 }
 
-async fn handle(client: reqwest::Client, line: String) -> Result<()> {
-    let filename = filenamify(&line);
+async fn handle(client: reqwest::Client, line: &str) -> Result<()> {
+    let filename = filenamify(line);
 
     let response = client.get(line).send().await?.error_for_status()?;
 
-    let file = File::create(filename).await?;
+    let file = File::create(filename)
+        .await
+        .context("failed to create output file")?;
     let mut writer = BufWriter::new(file);
 
     let mut stream = response.bytes_stream();
-    while let Some(chunk) = stream.try_next().await? {
-        writer.write_all(&chunk).await?;
+    while let Some(chunk) = stream.try_next().await.context("failed receiving data")? {
+        writer
+            .write_all(&chunk)
+            .await
+            .context("failed writing data")?;
     }
-    writer.flush().await?;
+    writer.flush().await.context("failed writing data")?;
     Ok(())
 }
