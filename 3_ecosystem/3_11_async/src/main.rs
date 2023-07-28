@@ -11,6 +11,7 @@ use tokio::{
     runtime,
     task::JoinSet,
 };
+use tracing::instrument;
 
 #[derive(Debug, Parser)]
 struct Cli {
@@ -35,6 +36,8 @@ fn main() -> Result<()> {
 }
 
 async fn async_main(path: &Path) -> Result<()> {
+    tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())?;
+
     let client = reqwest::Client::new();
 
     let file = File::open(path).await.context("couldn't open urls file")?;
@@ -49,10 +52,7 @@ async fn async_main(path: &Path) -> Result<()> {
     {
         let task_client = client.clone();
         join_set.spawn(async move {
-            match handle(task_client, &line).await {
-                Ok(_) => eprintln!("{line} OK"),
-                Err(err) => eprintln!("{line} {err}"),
-            }
+            let _ = handle(task_client, &line).await;
         });
     }
 
@@ -63,6 +63,7 @@ async fn async_main(path: &Path) -> Result<()> {
     Ok(())
 }
 
+#[instrument(skip(client), err)]
 async fn handle(client: reqwest::Client, line: &str) -> Result<()> {
     let filename = filenamify(line);
 
