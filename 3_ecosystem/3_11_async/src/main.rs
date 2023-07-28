@@ -65,7 +65,10 @@ async fn async_main(path: &Path) -> Result<()> {
 
 #[instrument(skip(client), err)]
 async fn handle(client: reqwest::Client, line: &str) -> Result<()> {
-    let filename = filenamify(line);
+    let mut filename = filenamify(line);
+    if !filename.ends_with(".html") {
+        filename.push_str(".html");
+    }
 
     let response = client.get(line).send().await?.error_for_status()?;
 
