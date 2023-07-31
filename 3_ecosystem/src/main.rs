@@ -8,14 +8,12 @@ use std::{
 use anyhow::{anyhow, Result};
 use auto_enums::auto_enum;
 use clap::Parser;
-use cli::{Config, OptConfig, SourceEnum};
 use figment::{
     providers::{Env, Format, Serialized, Yaml},
     Figment,
 };
 use futures::{stream::iter, Stream, StreamExt, TryStreamExt};
 use futures_enum::Stream;
-use input_image::InputImage;
 use isahc::{prelude::Configurable, HttpClient};
 use once_cell::sync::OnceCell;
 use tokio::{
@@ -24,6 +22,9 @@ use tokio::{
 };
 use tracing::{info, instrument, trace_span, Instrument};
 use tracing_subscriber::{fmt::format::FmtSpan, prelude::*, EnvFilter};
+
+use cli::{Config, OptConfig, SourceEnum};
+use input_image::{ClientResult, InputImage};
 
 mod cli;
 mod input_image;
@@ -66,15 +67,18 @@ async fn main() -> Result<()> {
 
     fs::create_dir_all(&out_dir).await?;
 
-    let client_cell: OnceCell<HttpClient> = OnceCell::new();
+    let client_cell = OnceCell::new();
     let client_getter = || {
-        client_cell.get_or_init(|| {
-            let mut builder = HttpClient::builder();
-            if let Some(max_download_speed) = max_download_speed {
-                builder = builder.max_download_speed(max_download_speed);
-            }
-            builder.build().unwrap()
-        })
+        client_cell
+            .get_or_init(|| {
+                let mut builder = HttpClient::builder();
+                if let Some(max_download_speed) = max_download_speed {
+                    builder = builder.max_download_speed(max_download_speed);
+                }
+                builder.build()
+            })
+            .as_ref()
+            .map_err(Clone::clone)
     };
 
     let mut results = into_input_images(source.into_enum())
@@ -102,7 +106,7 @@ async fn into_input_images(
 }
 
 #[instrument(skip(client_getter), fields(out_dir = ?out_dir.as_ref()), err)]
-async fn process_image<'a, F: Fn() -> &'a HttpClient>(
+async fn process_image<'a, F: FnOnce() -> ClientResult<'a>>(
     client_getter: F,
     in_image: InputImage,
     out_dir: impl AsRef<Path>,

@@ -21,14 +21,16 @@ pub enum InputImageError {
     #[error("io error")]
     Io(#[from] std::io::Error),
     #[error("network error")]
-    Net(#[from] isahc::error::Error),
+    Net(#[from] isahc::Error),
     #[error("failed request")]
     FailedRequest(StatusCode),
 }
 
+pub type ClientResult<'a> = Result<&'a HttpClient, isahc::Error>;
+
 impl InputImage {
     #[auto_enum(tokio1::AsyncRead)]
-    pub async fn open<'a, F: Fn() -> &'a HttpClient>(
+    pub async fn open<'a, F: FnOnce() -> ClientResult<'a>>(
         &self,
         client_getter: F,
     ) -> Result<impl AsyncRead, InputImageError> {
@@ -37,7 +39,7 @@ impl InputImage {
             match self {
                 InputImage::Path(path) => tokio::fs::File::open(path).await?,
                 InputImage::Uri(uri) => {
-                    let client = client_getter();
+                    let client = client_getter()?;
                     let response = client.get_async(uri).await?;
                     let status = response.status();
                     if !status.is_success() {
