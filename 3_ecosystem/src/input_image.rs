@@ -2,7 +2,10 @@ use std::path::PathBuf;
 
 use async_compat::CompatExt;
 use auto_enums::auto_enum;
-use isahc::{http::Uri, HttpClient};
+use isahc::{
+    http::{StatusCode, Uri},
+    HttpClient,
+};
 use thiserror::Error;
 use tokio::io::AsyncRead;
 use url::Url;
@@ -19,6 +22,8 @@ pub enum InputImageError {
     Io(#[from] std::io::Error),
     #[error("network error")]
     Net(#[from] isahc::error::Error),
+    #[error("failed request")]
+    FailedRequest(StatusCode),
 }
 
 impl InputImage {
@@ -34,6 +39,10 @@ impl InputImage {
                 InputImage::Uri(uri) => {
                     let client = client_getter();
                     let response = client.get_async(uri).await?;
+                    let status = response.status();
+                    if !status.is_success() {
+                        return Err(InputImageError::FailedRequest(status));
+                    }
                     response.into_body().compat()
                 }
             },
