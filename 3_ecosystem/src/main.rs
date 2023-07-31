@@ -101,7 +101,7 @@ async fn into_input_images(
     )
 }
 
-#[instrument(skip(client_getter, out_dir, quality), err)]
+#[instrument(skip(client_getter), fields(out_dir = ?out_dir.as_ref()), err)]
 async fn process_image<'a, F: Fn() -> &'a HttpClient>(
     client_getter: F,
     in_image: InputImage,
@@ -116,8 +116,10 @@ async fn process_image<'a, F: Fn() -> &'a HttpClient>(
     let mut in_data = vec![];
     in_image
         .open(client_getter)
+        .instrument(trace_span!("open"))
         .await?
         .read_to_end(&mut in_data)
+        .instrument(trace_span!("read"))
         .await?;
 
     let out_data = tokio_rayon::spawn(move || process_data(&in_data, quality)).await?;
@@ -132,7 +134,7 @@ async fn process_image<'a, F: Fn() -> &'a HttpClient>(
     Ok(())
 }
 
-#[instrument(skip(out_dir))]
+#[instrument]
 async fn create_out_file(out_dir: &Path, name: &str) -> Result<File, std::io::Error> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
