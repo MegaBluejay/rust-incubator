@@ -5,6 +5,7 @@ use bytes::Bytes;
 use futures::{Stream, TryStreamExt};
 use futures_enum::Stream;
 use thiserror::Error;
+use tokio::io::BufReader;
 use tokio_util::io::ReaderStream;
 use url::Url;
 
@@ -34,7 +35,7 @@ impl InputImage {
             match self {
                 InputImage::Path(path) => {
                     let file = tokio::fs::File::open(path).await?;
-                    ReaderStream::new(file).err_into()
+                    ReaderStream::new(BufReader::new(file)).err_into()
                 }
                 InputImage::Url(url) => {
                     let response = CLIENT.get(url).send().await?.error_for_status()?;

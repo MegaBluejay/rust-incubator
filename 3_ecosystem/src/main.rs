@@ -19,7 +19,7 @@ use futures_enum::Stream;
 use input_image::InputImage;
 use tokio::{
     fs::{self, File, OpenOptions},
-    io::AsyncWriteExt,
+    io::{AsyncWriteExt, BufWriter},
 };
 
 mod cli;
@@ -99,9 +99,9 @@ async fn process_image(
 
     let out_data = tokio_rayon::spawn(move || process_data(&in_data, quality)).await?;
 
-    let mut out_file = create_out_file(out_dir.as_ref(), &name).await?;
+    let out_file = create_out_file(out_dir.as_ref(), &name).await?;
 
-    out_file.write_all(&out_data).await?;
+    BufWriter::new(out_file).write_all(&out_data).await?;
 
     Ok(())
 }
