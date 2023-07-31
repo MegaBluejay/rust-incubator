@@ -15,7 +15,7 @@ use figment::{
 use futures::{stream::iter, Stream, StreamExt, TryStreamExt};
 use futures_enum::Stream;
 use isahc::{prelude::Configurable, HttpClient};
-use once_cell::sync::OnceCell;
+use once_cell::sync::Lazy;
 use tokio::{
     fs::{self, File, OpenOptions},
     io::{AsyncReadExt, AsyncWriteExt},
@@ -49,24 +49,13 @@ async fn main() -> Result<()> {
 
     fs::create_dir_all(&out_dir).await?;
 
-    let client_cell = OnceCell::new();
-    let client_getter = || {
-        client_cell
-            .get_or_init(|| {
-                let mut builder = HttpClient::builder();
-                if let Some(max_download_speed) = max_download_speed {
-                    builder = builder.max_download_speed(max_download_speed);
-                }
-                builder.build()
-            })
-            .as_ref()
-            .map_err(Clone::clone)
-    };
+    let client = make_client(max_download_speed);
+    let client_getter = || client.as_ref().map_err(Clone::clone);
 
     let mut results = into_input_images(source)
         .await?
         .err_into()
-        .map_ok(|in_image| process_image(client_getter, in_image, &out_dir, quality))
+        .map_ok(|in_image| process_image(in_image, &out_dir, quality, &client_getter))
         .try_buffer_unordered(max_concurrent);
 
     while results.next().await.is_some() {}
@@ -93,6 +82,18 @@ fn get_config() -> Result<(Config, SourceEnum)> {
     Ok((config, source.into()))
 }
 
+fn make_client(
+    max_download_speed: Option<u64>,
+) -> Lazy<Result<HttpClient, isahc::Error>, impl Fn() -> Result<HttpClient, isahc::Error>> {
+    Lazy::new(move || {
+        let mut builder = HttpClient::builder();
+        if let Some(max_download_speed) = max_download_speed {
+            builder = builder.max_download_speed(max_download_speed);
+        }
+        builder.build()
+    })
+}
+
 #[auto_enum(Stream)]
 async fn into_input_images(
     source: SourceEnum,
@@ -108,10 +109,10 @@ async fn into_input_images(
 
 #[instrument(skip(client_getter), fields(out_dir = ?out_dir.as_ref()), err)]
 async fn process_image<'a, F: FnOnce() -> ClientResult<'a>>(
-    client_getter: F,
     in_image: InputImage,
     out_dir: impl AsRef<Path>,
     quality: f32,
+    client_getter: F,
 ) -> Result<()> {
     let name = in_image
         .file_name()
