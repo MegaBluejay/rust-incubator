@@ -21,6 +21,8 @@ use tokio::{
     fs::{self, File, OpenOptions},
     io::{AsyncWriteExt, BufWriter},
 };
+use tracing::{info, instrument};
+use tracing_subscriber::{prelude::*, EnvFilter};
 
 mod cli;
 mod global_client;
@@ -28,6 +30,11 @@ mod input_image;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(EnvFilter::from_default_env())
+        .init();
+
     let cli::Cli {
         config,
         config_file,
@@ -54,6 +61,8 @@ async fn main() -> Result<()> {
         .unopt()
         .map_err(|missing| anyhow!("missing config value: {:?}", missing))?;
 
+    info!(quality, ?out_dir, max_concurrent);
+
     fs::create_dir_all(&out_dir).await?;
 
     let mut results = into_input_images(source.into_enum())
@@ -62,11 +71,7 @@ async fn main() -> Result<()> {
         .map_ok(|in_image| process_image(in_image, &out_dir, quality))
         .try_buffer_unordered(max_concurrent);
 
-    while let Some(result) = results.next().await {
-        if let Err(err) = result {
-            eprintln!("{err}");
-        }
-    }
+    while results.next().await.is_some() {}
 
     Ok(())
 }
@@ -84,6 +89,7 @@ async fn into_input_images(
     )
 }
 
+#[instrument(skip(out_dir, quality), err)]
 async fn process_image(
     in_image: InputImage,
     out_dir: impl AsRef<Path>,
@@ -106,12 +112,16 @@ async fn process_image(
     Ok(())
 }
 
+#[instrument(skip(out_dir))]
 async fn create_out_file(out_dir: &Path, name: &str) -> Result<File, std::io::Error> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     for out_path in out_paths(out_dir, name) {
         match options.open(&out_path).await {
-            Ok(file) => return Ok(file),
+            Ok(file) => {
+                info!(?out_path);
+                return Ok(file);
+            }
             Err(err) => match err.kind() {
                 ErrorKind::AlreadyExists => {}
                 _ => return Err(err),
@@ -156,6 +166,7 @@ fn out_paths<'a>(
     OutNames::new(name).map(|out_name| out_dir.join(out_name))
 }
 
+#[instrument(skip(in_data, quality))]
 fn process_data(in_data: &[u8], quality: f32) -> Result<Vec<u8>> {
     std::panic::catch_unwind(move || {
         let dec = mozjpeg::Decompress::with_markers(mozjpeg::ALL_MARKERS).from_mem(in_data)?;
@@ -164,6 +175,7 @@ fn process_data(in_data: &[u8], quality: f32) -> Result<Vec<u8>> {
         let width = image.width();
         let height = image.height();
         let color_space = image.color_space();
+        info!(width, height, ?color_space);
 
         let pixels = image.read_scanlines_flat().unwrap();
         assert!(image.finish_decompress());
