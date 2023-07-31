@@ -42,17 +42,14 @@ async fn main() -> Result<()> {
         source,
     } = cli::Cli::parse();
 
-    let opt_config: OptConfig = tokio::task::spawn_blocking(move || {
-        let mut figment = Figment::new();
-        if let Some(config_file) = &config_file {
-            figment = figment.merge(Yaml::file(config_file));
-        }
-        figment
-            .merge(Env::prefixed("STEP3_"))
-            .merge(Serialized::defaults(config))
-            .extract()
-    })
-    .await??;
+    let mut figment = Figment::new();
+    if let Some(config_file) = &config_file {
+        figment = figment.merge(Yaml::file(config_file));
+    }
+    let opt_config: OptConfig = figment
+        .merge(Env::prefixed("STEP3_"))
+        .merge(Serialized::defaults(config))
+        .extract()?;
 
     let Config {
         quality,
