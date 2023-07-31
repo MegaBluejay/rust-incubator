@@ -2,19 +2,19 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser};
 use patharg::InputArg;
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 
 use super::input_image::InputImage;
 
 #[derive(Debug, Parser)]
 pub struct Cli {
-    #[arg(short, long)]
-    pub quality: f32,
-    #[arg(short, long)]
-    pub out_dir: PathBuf,
-    #[arg(short = 'j', long)]
-    pub max_concurrent: usize,
+    #[command(flatten)]
+    pub config: OptConfig,
     #[command(flatten)]
     pub source: Source,
+    #[arg(long)]
+    pub config_file: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -37,5 +37,40 @@ impl Source {
         } else {
             SourceEnum::Images(self.image.unwrap())
         }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Args, Serialize, Deserialize)]
+pub struct OptConfig {
+    #[arg(short, long)]
+    pub quality: Option<f32>,
+    #[arg(short, long)]
+    pub out_dir: Option<PathBuf>,
+    #[arg(short = 'j', long)]
+    pub max_concurrent: Option<usize>,
+}
+
+#[derive(Debug)]
+pub struct Config {
+    pub quality: f32,
+    pub out_dir: PathBuf,
+    pub max_concurrent: usize,
+}
+
+#[derive(Debug)]
+pub enum Missing {
+    Quality,
+    OutDir,
+    MaxConcurrent,
+}
+
+impl OptConfig {
+    pub fn unopt(self) -> Result<Config, Missing> {
+        Ok(Config {
+            quality: self.quality.ok_or(Missing::Quality)?,
+            out_dir: self.out_dir.ok_or(Missing::OutDir)?,
+            max_concurrent: self.max_concurrent.ok_or(Missing::MaxConcurrent)?,
+        })
     }
 }

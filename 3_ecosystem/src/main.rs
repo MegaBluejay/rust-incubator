@@ -9,7 +9,11 @@ use anyhow::{anyhow, Result};
 use auto_enums::auto_enum;
 use bytes::BytesMut;
 use clap::Parser;
-use cli::SourceEnum;
+use cli::{Config, OptConfig, SourceEnum};
+use figment::{
+    providers::{Env, Format, Serialized, Yaml},
+    Figment,
+};
 use futures::{stream::iter, Stream, StreamExt, TryStreamExt};
 use futures_enum::Stream;
 use input_image::InputImage;
@@ -24,15 +28,39 @@ mod input_image;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args = cli::Cli::parse();
+    let cli::Cli {
+        config,
+        config_file,
+        source,
+    } = cli::Cli::parse();
 
-    fs::create_dir_all(&args.out_dir).await?;
+    let opt_config: OptConfig = tokio::task::spawn_blocking(move || {
+        let mut figment = Figment::new();
+        if let Some(config_file) = &config_file {
+            figment = figment.merge(Yaml::file(config_file));
+        }
+        figment
+            .merge(Env::prefixed("STEP3_"))
+            .merge(Serialized::defaults(config))
+            .extract()
+    })
+    .await??;
 
-    let mut results = into_input_images(args.source.into_enum())
+    let Config {
+        quality,
+        out_dir,
+        max_concurrent,
+    } = opt_config
+        .unopt()
+        .map_err(|missing| anyhow!("missing config value: {:?}", missing))?;
+
+    fs::create_dir_all(&out_dir).await?;
+
+    let mut results = into_input_images(source.into_enum())
         .await?
         .err_into()
-        .map_ok(|in_image| process_image(in_image, &args.out_dir, args.quality))
-        .try_buffer_unordered(args.max_concurrent);
+        .map_ok(|in_image| process_image(in_image, &out_dir, quality))
+        .try_buffer_unordered(max_concurrent);
 
     while let Some(result) = results.next().await {
         if let Err(err) = result {
