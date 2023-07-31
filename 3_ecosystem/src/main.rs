@@ -78,7 +78,7 @@ async fn main() -> Result<()> {
             .map_err(Clone::clone)
     };
 
-    let mut results = into_input_images(source.into_enum())
+    let mut results = into_input_images(source.into())
         .await?
         .err_into()
         .map_ok(|in_image| process_image(client_getter, in_image, &out_dir, quality))

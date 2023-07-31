@@ -30,12 +30,12 @@ pub enum SourceEnum {
     Images(Vec<InputImage>),
 }
 
-impl Source {
-    pub fn into_enum(self) -> SourceEnum {
-        if let Some(input_file) = self.input_file {
-            SourceEnum::InputFile(input_file)
+impl From<Source> for SourceEnum {
+    fn from(value: Source) -> Self {
+        if let Some(input_file) = value.input_file {
+            Self::InputFile(input_file)
         } else {
-            SourceEnum::Images(self.image.unwrap())
+            Self::Images(value.image.unwrap())
         }
     }
 }
