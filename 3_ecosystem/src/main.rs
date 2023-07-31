@@ -36,27 +36,16 @@ async fn main() -> Result<()> {
         .with(EnvFilter::from_default_env())
         .init();
 
-    let Cli {
-        config,
-        config_file,
-        source,
-    } = Cli::parse();
+    let (config, source) = get_config()?;
 
-    let mut figment = Figment::new();
-    if let Some(config_file) = &config_file {
-        figment = figment.merge(Yaml::file(config_file));
-    }
+    info!(?config);
+
     let Config {
         quality,
         out_dir,
         max_concurrent,
         max_download_speed,
-    } = figment
-        .merge(Env::prefixed("STEP3_"))
-        .merge(Serialized::defaults(config))
-        .extract()?;
-
-    info!(quality, ?out_dir, max_concurrent, max_download_speed);
+    } = config;
 
     fs::create_dir_all(&out_dir).await?;
 
@@ -74,7 +63,7 @@ async fn main() -> Result<()> {
             .map_err(Clone::clone)
     };
 
-    let mut results = into_input_images(source.into())
+    let mut results = into_input_images(source)
         .await?
         .err_into()
         .map_ok(|in_image| process_image(client_getter, in_image, &out_dir, quality))
@@ -83,6 +72,25 @@ async fn main() -> Result<()> {
     while results.next().await.is_some() {}
 
     Ok(())
+}
+
+fn get_config() -> Result<(Config, SourceEnum)> {
+    let Cli {
+        config: cli_config,
+        config_file,
+        source,
+    } = Cli::try_parse()?;
+
+    let mut figment = Figment::new();
+    if let Some(config_file) = &config_file {
+        figment = figment.merge(Yaml::file(config_file));
+    }
+
+    let config: Config = figment
+        .merge(Env::prefixed("STEP3_"))
+        .merge(Serialized::defaults(cli_config))
+        .extract()?;
+    Ok((config, source.into()))
 }
 
 #[auto_enum(Stream)]
