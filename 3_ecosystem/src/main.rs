@@ -111,8 +111,7 @@ async fn process_image<'a, F: Fn() -> &'a HttpClient>(
     let name = in_image
         .file_name()
         .and_then(|file_name| file_name.split('.').next())
-        .unwrap_or("out")
-        .to_owned();
+        .unwrap_or("out");
 
     let mut in_data = vec![];
     in_image
@@ -123,7 +122,7 @@ async fn process_image<'a, F: Fn() -> &'a HttpClient>(
 
     let out_data = tokio_rayon::spawn(move || process_data(&in_data, quality)).await?;
 
-    let mut out_file = create_out_file(out_dir.as_ref(), &name).await?;
+    let mut out_file = create_out_file(out_dir.as_ref(), name).await?;
 
     out_file
         .write_all(&out_data)

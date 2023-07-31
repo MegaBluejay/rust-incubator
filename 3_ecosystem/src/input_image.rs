@@ -24,7 +24,7 @@ pub enum InputImageError {
 impl InputImage {
     #[auto_enum(tokio1::AsyncRead)]
     pub async fn open<'a, F: Fn() -> &'a HttpClient>(
-        self,
+        &self,
         client_getter: F,
     ) -> Result<impl AsyncRead, InputImageError> {
         Ok(
