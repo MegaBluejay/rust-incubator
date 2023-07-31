@@ -21,8 +21,8 @@ use tokio::{
     fs::{self, File, OpenOptions},
     io::{AsyncWriteExt, BufWriter},
 };
-use tracing::{info, instrument};
-use tracing_subscriber::{prelude::*, EnvFilter};
+use tracing::{info, instrument, trace_span, Instrument};
+use tracing_subscriber::{fmt::format::FmtSpan, prelude::*, EnvFilter};
 
 mod cli;
 mod global_client;
@@ -31,7 +31,7 @@ mod input_image;
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::fmt::layer().with_span_events(FmtSpan::CLOSE))
         .with(EnvFilter::from_default_env())
         .init();
 
@@ -101,13 +101,21 @@ async fn process_image(
         .unwrap_or("out")
         .to_owned();
 
-    let in_data: BytesMut = in_image.bytes_stream().await?.try_collect().await?;
+    let in_data: BytesMut = in_image
+        .bytes_stream()
+        .await?
+        .try_collect()
+        .instrument(trace_span!("read"))
+        .await?;
 
     let out_data = tokio_rayon::spawn(move || process_data(&in_data, quality)).await?;
 
     let out_file = create_out_file(out_dir.as_ref(), &name).await?;
 
-    BufWriter::new(out_file).write_all(&out_data).await?;
+    BufWriter::new(out_file)
+        .write_all(&out_data)
+        .instrument(trace_span!("write"))
+        .await?;
 
     Ok(())
 }
@@ -169,6 +177,7 @@ fn out_paths<'a>(
 #[instrument(skip(in_data, quality))]
 fn process_data(in_data: &[u8], quality: f32) -> Result<Vec<u8>> {
     std::panic::catch_unwind(move || {
+        let decompress_span = trace_span!("decompress").entered();
         let dec = mozjpeg::Decompress::with_markers(mozjpeg::ALL_MARKERS).from_mem(in_data)?;
         let mut image = dec.rgb()?;
 
@@ -179,7 +188,9 @@ fn process_data(in_data: &[u8], quality: f32) -> Result<Vec<u8>> {
 
         let pixels = image.read_scanlines_flat().unwrap();
         assert!(image.finish_decompress());
+        decompress_span.exit();
 
+        let _compress_span = trace_span!("compress").entered();
         let mut comp = mozjpeg::Compress::new(color_space);
         comp.set_size(width, height);
         comp.set_quality(quality);
