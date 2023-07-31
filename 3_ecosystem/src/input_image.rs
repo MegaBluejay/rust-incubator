@@ -1,20 +1,16 @@
 use std::path::PathBuf;
 
+use async_compat::CompatExt;
 use auto_enums::auto_enum;
-use bytes::Bytes;
-use futures::{Stream, TryStreamExt};
-use futures_enum::Stream;
+use isahc::{http::Uri, HttpClient};
 use thiserror::Error;
-use tokio::io::BufReader;
-use tokio_util::io::ReaderStream;
+use tokio::io::AsyncRead;
 use url::Url;
-
-use super::global_client::CLIENT;
 
 #[derive(Debug, Clone)]
 pub enum InputImage {
     Path(PathBuf),
-    Url(Url),
+    Uri(Uri),
 }
 
 #[derive(Debug, Error)]
@@ -22,24 +18,23 @@ pub enum InputImageError {
     #[error("io error")]
     Io(#[from] std::io::Error),
     #[error("network error")]
-    Net(#[from] reqwest::Error),
+    Net(#[from] isahc::error::Error),
 }
 
 impl InputImage {
-    #[auto_enum(Stream)]
-    pub async fn bytes_stream(
+    #[auto_enum(tokio1::AsyncRead)]
+    pub async fn open<'a, F: Fn() -> &'a HttpClient>(
         self,
-    ) -> Result<impl Stream<Item = Result<Bytes, InputImageError>>, InputImageError> {
+        client_getter: F,
+    ) -> Result<impl AsyncRead, InputImageError> {
         Ok(
             #[nested]
             match self {
-                InputImage::Path(path) => {
-                    let file = tokio::fs::File::open(path).await?;
-                    ReaderStream::new(BufReader::new(file)).err_into()
-                }
-                InputImage::Url(url) => {
-                    let response = CLIENT.get(url).send().await?.error_for_status()?;
-                    response.bytes_stream().err_into()
+                InputImage::Path(path) => tokio::fs::File::open(path).await?,
+                InputImage::Uri(uri) => {
+                    let client = client_getter();
+                    let response = client.get_async(uri).await?;
+                    response.into_body().compat()
                 }
             },
         )
@@ -48,15 +43,22 @@ impl InputImage {
     pub fn file_name(&self) -> Option<&str> {
         match self {
             InputImage::Path(path) => path.file_name().and_then(|file_name| file_name.to_str()),
-            InputImage::Url(url) => url.path_segments().and_then(|segments| segments.last()),
+            InputImage::Uri(uri) => uri
+                .path()
+                .strip_prefix('/')
+                .map(|rest| rest.split('/'))
+                .and_then(|segments| segments.last()),
         }
     }
 }
 
 impl From<String> for InputImage {
     fn from(value: String) -> Self {
-        Url::parse(&value)
-            .map(InputImage::Url)
-            .unwrap_or_else(|_| InputImage::Path(value.into()))
+        if value.parse::<Url>().is_ok() {
+            if let Ok(uri) = value.parse::<Uri>() {
+                return InputImage::Uri(uri);
+            }
+        }
+        InputImage::Path(value.into())
     }
 }

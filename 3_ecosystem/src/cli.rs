@@ -49,6 +49,8 @@ pub struct OptConfig {
     pub out_dir: Option<PathBuf>,
     #[arg(short = 'j', long)]
     pub max_concurrent: Option<usize>,
+    #[arg(short = 'd', long)]
+    pub max_download_speed: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -56,6 +58,7 @@ pub struct Config {
     pub quality: f32,
     pub out_dir: PathBuf,
     pub max_concurrent: usize,
+    pub max_download_speed: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -71,6 +74,7 @@ impl OptConfig {
             quality: self.quality.ok_or(Missing::Quality)?,
             out_dir: self.out_dir.ok_or(Missing::OutDir)?,
             max_concurrent: self.max_concurrent.ok_or(Missing::MaxConcurrent)?,
+            max_download_speed: self.max_download_speed,
         })
     }
 }

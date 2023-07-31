@@ -7,7 +7,6 @@ use std::{
 
 use anyhow::{anyhow, Result};
 use auto_enums::auto_enum;
-use bytes::BytesMut;
 use clap::Parser;
 use cli::{Config, OptConfig, SourceEnum};
 use figment::{
@@ -17,15 +16,16 @@ use figment::{
 use futures::{stream::iter, Stream, StreamExt, TryStreamExt};
 use futures_enum::Stream;
 use input_image::InputImage;
+use isahc::{prelude::Configurable, HttpClient};
+use once_cell::sync::OnceCell;
 use tokio::{
     fs::{self, File, OpenOptions},
-    io::{AsyncWriteExt, BufWriter},
+    io::{AsyncReadExt, AsyncWriteExt},
 };
 use tracing::{info, instrument, trace_span, Instrument};
 use tracing_subscriber::{fmt::format::FmtSpan, prelude::*, EnvFilter};
 
 mod cli;
-mod global_client;
 mod input_image;
 
 #[tokio::main]
@@ -57,18 +57,30 @@ async fn main() -> Result<()> {
         quality,
         out_dir,
         max_concurrent,
+        max_download_speed,
     } = opt_config
         .unopt()
         .map_err(|missing| anyhow!("missing config value: {:?}", missing))?;
 
-    info!(quality, ?out_dir, max_concurrent);
+    info!(quality, ?out_dir, max_concurrent, max_download_speed);
 
     fs::create_dir_all(&out_dir).await?;
+
+    let client_cell: OnceCell<HttpClient> = OnceCell::new();
+    let client_getter = || {
+        client_cell.get_or_init(|| {
+            let mut builder = HttpClient::builder();
+            if let Some(max_download_speed) = max_download_speed {
+                builder = builder.max_download_speed(max_download_speed);
+            }
+            builder.build().unwrap()
+        })
+    };
 
     let mut results = into_input_images(source.into_enum())
         .await?
         .err_into()
-        .map_ok(|in_image| process_image(in_image, &out_dir, quality))
+        .map_ok(|in_image| process_image(client_getter, in_image, &out_dir, quality))
         .try_buffer_unordered(max_concurrent);
 
     while results.next().await.is_some() {}
@@ -89,8 +101,9 @@ async fn into_input_images(
     )
 }
 
-#[instrument(skip(out_dir, quality), err)]
-async fn process_image(
+#[instrument(skip(client_getter, out_dir, quality), err)]
+async fn process_image<'a, F: Fn() -> &'a HttpClient>(
+    client_getter: F,
     in_image: InputImage,
     out_dir: impl AsRef<Path>,
     quality: f32,
@@ -101,18 +114,18 @@ async fn process_image(
         .unwrap_or("out")
         .to_owned();
 
-    let in_data: BytesMut = in_image
-        .bytes_stream()
+    let mut in_data = vec![];
+    in_image
+        .open(client_getter)
         .await?
-        .try_collect()
-        .instrument(trace_span!("read"))
+        .read_to_end(&mut in_data)
         .await?;
 
     let out_data = tokio_rayon::spawn(move || process_data(&in_data, quality)).await?;
 
-    let out_file = create_out_file(out_dir.as_ref(), &name).await?;
+    let mut out_file = create_out_file(out_dir.as_ref(), &name).await?;
 
-    BufWriter::new(out_file)
+    out_file
         .write_all(&out_data)
         .instrument(trace_span!("write"))
         .await?;
