@@ -23,7 +23,7 @@ use tokio::{
 use tracing::{info, instrument, trace_span, Instrument};
 use tracing_subscriber::{fmt::format::FmtSpan, prelude::*, EnvFilter};
 
-use cli::{Config, OptConfig, SourceEnum};
+use cli::{Cli, Config, SourceEnum};
 use input_image::{ClientResult, InputImage};
 
 mod cli;
@@ -36,29 +36,25 @@ async fn main() -> Result<()> {
         .with(EnvFilter::from_default_env())
         .init();
 
-    let cli::Cli {
+    let Cli {
         config,
         config_file,
         source,
-    } = cli::Cli::parse();
+    } = Cli::parse();
 
     let mut figment = Figment::new();
     if let Some(config_file) = &config_file {
         figment = figment.merge(Yaml::file(config_file));
     }
-    let opt_config: OptConfig = figment
-        .merge(Env::prefixed("STEP3_"))
-        .merge(Serialized::defaults(config))
-        .extract()?;
-
     let Config {
         quality,
         out_dir,
         max_concurrent,
         max_download_speed,
-    } = opt_config
-        .unopt()
-        .map_err(|missing| anyhow!("missing config value: {:?}", missing))?;
+    } = figment
+        .merge(Env::prefixed("STEP3_"))
+        .merge(Serialized::defaults(config))
+        .extract()?;
 
     info!(quality, ?out_dir, max_concurrent, max_download_speed);
 
