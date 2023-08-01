@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use auto_enums::auto_enum;
 use clap::Parser;
 use figment::{
@@ -14,6 +14,10 @@ use figment::{
 };
 use futures::{stream::iter, Stream, StreamExt, TryStreamExt};
 use futures_enum::Stream;
+use image::{
+    codecs::jpeg::{JpegDecoder, JpegEncoder},
+    DynamicImage,
+};
 use isahc::{prelude::Configurable, HttpClient};
 use once_cell::sync::Lazy;
 use tokio::{
@@ -111,7 +115,7 @@ async fn into_input_images(
 async fn process_image<'a, F: FnOnce() -> ClientResult<'a>>(
     in_image: InputImage,
     out_dir: impl AsRef<Path>,
-    quality: f32,
+    quality: u8,
     client_getter: F,
 ) -> Result<()> {
     let name = in_image
@@ -194,33 +198,16 @@ fn out_paths<'a>(
     OutNames::new(name).map(|out_name| out_dir.join(out_name))
 }
 
-#[instrument(skip(in_data, quality))]
-fn process_data(in_data: &[u8], quality: f32) -> Result<Vec<u8>> {
-    std::panic::catch_unwind(move || {
-        let decompress_span = trace_span!("decompress").entered();
-        let dec = mozjpeg::Decompress::with_markers(mozjpeg::ALL_MARKERS).from_mem(in_data)?;
-        let mut image = dec.rgb()?;
+#[instrument(skip(in_data))]
+fn process_data(in_data: &[u8], quality: u8) -> Result<Vec<u8>> {
+    let decompress_span = trace_span!("decompress").entered();
+    let decoder = JpegDecoder::new(in_data)?;
+    let image = DynamicImage::from_decoder(decoder)?;
+    decompress_span.exit();
 
-        let width = image.width();
-        let height = image.height();
-        let color_space = image.color_space();
-        info!(width, height, ?color_space);
-
-        let pixels = image.read_scanlines_flat().unwrap();
-        assert!(image.finish_decompress());
-        decompress_span.exit();
-
-        let _compress_span = trace_span!("compress").entered();
-        let mut comp = mozjpeg::Compress::new(color_space);
-        comp.set_size(width, height);
-        comp.set_quality(quality);
-        comp.set_mem_dest();
-        comp.start_compress();
-
-        assert!(comp.write_scanlines(&pixels));
-        comp.finish_compress();
-
-        Ok(comp.data_to_vec().unwrap())
-    })
-    .map_err(|_| anyhow!("mozjpeg error"))?
+    let _compress_span = trace_span!("compress").entered();
+    let mut buffer = vec![];
+    let mut encoder = JpegEncoder::new_with_quality(&mut buffer, quality);
+    encoder.encode_image(&image)?;
+    Ok(buffer)
 }

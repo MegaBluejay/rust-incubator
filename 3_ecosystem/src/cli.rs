@@ -46,7 +46,7 @@ impl From<Source> for SourceEnum {
 #[derive(Debug, Args, Serialize, Deserialize)]
 pub struct Config {
     #[arg(short, long)]
-    pub quality: f32,
+    pub quality: u8,
     #[arg(short, long)]
     pub out_dir: PathBuf,
     #[arg(short = 'j', long)]
