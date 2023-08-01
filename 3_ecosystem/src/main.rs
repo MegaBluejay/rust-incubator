@@ -27,10 +27,10 @@ use tokio::{
 use tracing::{info, instrument, trace_span, Instrument};
 use tracing_subscriber::{fmt::format::FmtSpan, prelude::*, EnvFilter};
 
-use cli::{Cli, Config, SourceEnum};
+use config::{Cli, Config, SourceEnum};
 use input_image::{ClientResult, InputImage};
 
-mod cli;
+mod config;
 mod input_image;
 
 #[tokio::main]
