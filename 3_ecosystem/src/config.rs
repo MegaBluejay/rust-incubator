@@ -75,6 +75,7 @@ impl Default for Config {
 // A separate enum is neccessary to derive the instances
 // I'm also not including deprecated types
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, ValueEnum)]
+#[serde(rename_all = "snake_case")]
 pub enum CompressionType {
     Default,
     Fast,
