@@ -169,6 +169,8 @@ async fn process_image<'a, F: FnOnce() -> ClientResult<'a>>(
         .instrument(debug_span!("write"))
         .await?;
 
+    info!("processed");
+
     Ok(())
 }
 
