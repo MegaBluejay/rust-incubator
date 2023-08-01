@@ -222,7 +222,7 @@ fn process_data(
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{OptionalConfig, Source};
+    use crate::config::{CompressionType, OptionalConfig, Source};
 
     use super::*;
 
@@ -231,8 +231,12 @@ mod tests {
         figment::Jail::expect_with(|jail| {
             let config_file = "config.yaml".into();
 
-            jail.create_file(&config_file, "jpeg_quality: 10")?;
-            jail.set_env("STEP3_JPEG_QUALITY", "20");
+            jail.create_file(
+                &config_file,
+                "jpeg_quality: 10\npng_compression: fast\nmax_concurrent: 3",
+            )?;
+            jail.set_env("STEP3_JPEG_QUALITY", 20);
+            jail.set_env("STEP3_PNG_COMPRESSION", "best");
 
             let cli = Cli {
                 config: OptionalConfig {
@@ -249,6 +253,8 @@ mod tests {
             let (config, _source) = get_config(cli).unwrap();
 
             assert_eq!(config.jpeg_quality, 30);
+            assert_eq!(config.png_compression, CompressionType::Best);
+            assert_eq!(config.max_concurrent, Some(3));
 
             Ok(())
         });
