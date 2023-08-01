@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
-use clap::{Args, Parser};
+use clap::{Args, Parser, ValueEnum};
+use image::codecs::png;
 use optional_struct::{optional_struct, Applyable};
 use patharg::InputArg;
 use serde::{Deserialize, Serialize};
@@ -45,8 +46,10 @@ impl From<Source> for SourceEnum {
 #[skip_serializing_none]
 #[derive(Debug, Args, Serialize, Deserialize)]
 pub struct Config {
-    #[arg(short, long)]
-    pub quality: u8,
+    #[arg(short = 'q', long)]
+    pub jpeg_quality: u8,
+    #[arg(short = 'c', long)]
+    pub png_compression: CompressionType,
     #[arg(short, long)]
     pub out_dir: PathBuf,
     #[arg(short = 'j', long)]
@@ -58,10 +61,28 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            quality: 80,
+            jpeg_quality: 80,
+            png_compression: CompressionType::Default,
             out_dir: "./out".into(),
             max_concurrent: None,
             max_download_speed: None,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, ValueEnum)]
+pub enum CompressionType {
+    Default,
+    Fast,
+    Best,
+}
+
+impl From<CompressionType> for png::CompressionType {
+    fn from(value: CompressionType) -> Self {
+        match value {
+            CompressionType::Default => png::CompressionType::Default,
+            CompressionType::Fast => png::CompressionType::Fast,
+            CompressionType::Best => png::CompressionType::Best,
         }
     }
 }
