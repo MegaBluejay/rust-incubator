@@ -34,6 +34,8 @@ pub enum SourceEnum {
 
 impl From<Source> for SourceEnum {
     fn from(value: Source) -> Self {
+        // clap currently doesn't have a way of using an enum for a `multiple = false` `ArgGroup`,
+        // but since it guarantees only one of the fields is present, this is valid
         if let Some(input_file) = value.input_file {
             Self::InputFile(input_file)
         } else {
@@ -70,6 +72,8 @@ impl Default for Config {
     }
 }
 
+// A separate enum is neccessary to derive the instances
+// I'm also not including deprecated types
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, ValueEnum)]
 pub enum CompressionType {
     Default,

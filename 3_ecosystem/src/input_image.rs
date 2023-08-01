@@ -29,6 +29,7 @@ pub enum InputImageError {
 pub type ClientResult<'a> = Result<&'a HttpClient, isahc::Error>;
 
 impl InputImage {
+    // using a function for the client so that one never gets initialized when there aren't any uri arguments
     #[auto_enum(tokio1::AsyncRead)]
     pub async fn open<'a, F: FnOnce() -> ClientResult<'a>>(
         &self,
@@ -65,6 +66,8 @@ impl InputImage {
 
 impl From<String> for InputImage {
     fn from(value: String) -> Self {
+        // I'm using `url::Url` to validate a full url here
+        // since `http::Uri` doesn't appear to have any built-in functionality like that
         if value.parse::<Url>().is_ok() {
             if let Ok(uri) = value.parse::<Uri>() {
                 return InputImage::Uri(uri);

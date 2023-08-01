@@ -86,6 +86,8 @@ fn get_config(cli: Cli) -> Result<(Config, SourceEnum)> {
         source,
     } = cli;
 
+    // I went with `figment` instead of `config` for configuration merging
+    // because its `Serialized` source is convenient for values defined in code
     let mut figment = Figment::new().merge(Serialized::defaults(Config::default()));
     if let Some(config_file) = &config_file {
         figment = figment.merge(Yaml::file(config_file));
@@ -159,6 +161,8 @@ async fn process_image<'a, F: FnOnce() -> ClientResult<'a>>(
         .instrument(debug_span!("read"))
         .await?;
 
+    // since decoding/encoding an image is a cpu-bound task
+    // using a thread pool like `rayon` seems like a good idea
     let (out_data, format) =
         tokio_rayon::spawn(move || process_data(&in_data, jpeg_quality, png_compression)).await?;
 
@@ -180,6 +184,8 @@ fn process_data(
     quality: u8,
     png_compression: png::CompressionType,
 ) -> Result<(Vec<u8>, ImageFormat)> {
+    // determining the file type from header bytes instead of extension is more reliable,
+    // and allows this to work even when we can't extract a filename from a url
     let format = debug_span!("detect").in_scope(|| match imghdr::from_bytes(in_data) {
         Some(imghdr::Type::Png) => Ok(ImageFormat::Png),
         Some(imghdr::Type::Jpeg) => Ok(ImageFormat::Jpeg),
@@ -197,6 +203,7 @@ fn process_data(
         match &format {
             ImageFormat::Jpeg => image.write_to(&mut buffer, ImageOutputFormat::Jpeg(quality)),
             ImageFormat::Png => {
+                // can't use the `write_to` method for pngs because it doesn't allow compression configuration
                 let encoder =
                     PngEncoder::new_with_quality(&mut buffer, png_compression, Default::default());
                 encoder.write_image(
