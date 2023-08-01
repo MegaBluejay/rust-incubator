@@ -295,7 +295,7 @@ mod tests {
                     ..Default::default()
                 },
                 source: Source {
-                    input_file: Some(patharg::InputArg::Path("image.png".into())),
+                    input_file: Some(patharg::InputArg::Path("list".into())),
                     image: None,
                 },
                 config_file: Some(config_file),
