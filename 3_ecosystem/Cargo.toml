@@ -16,6 +16,7 @@ futures = "0.3.28"
 futures-enum = "0.1.17"
 image = "0.24.6"
 isahc = "1.7.2"
+num_cpus = "1.16.0"
 once_cell = "1.18.0"
 optional_struct = "0.3.1"
 patharg = { version = "0.3.0", features = ["tokio"] }

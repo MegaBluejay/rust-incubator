@@ -51,6 +51,8 @@ async fn main() -> Result<()> {
         max_download_speed,
     } = config;
 
+    let max_concurrent = max_concurrent.unwrap_or_else(num_cpus::get);
+
     fs::create_dir_all(&out_dir).await?;
 
     let client = make_client(max_download_speed);
@@ -74,7 +76,7 @@ fn get_config() -> Result<(Config, SourceEnum)> {
         source,
     } = Cli::try_parse()?;
 
-    let mut figment = Figment::new();
+    let mut figment = Figment::new().merge(Serialized::defaults(Config::default()));
     if let Some(config_file) = &config_file {
         figment = figment.merge(Yaml::file(config_file));
     }

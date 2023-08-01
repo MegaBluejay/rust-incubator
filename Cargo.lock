@@ -2846,6 +2846,7 @@ dependencies = [
  "futures-enum",
  "image",
  "isahc",
+ "num_cpus",
  "once_cell",
  "optional_struct",
  "patharg",

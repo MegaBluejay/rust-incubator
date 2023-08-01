@@ -50,7 +50,18 @@ pub struct Config {
     #[arg(short, long)]
     pub out_dir: PathBuf,
     #[arg(short = 'j', long)]
-    pub max_concurrent: usize,
+    pub max_concurrent: Option<usize>,
     #[arg(short = 'd', long)]
     pub max_download_speed: Option<u64>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            quality: 80,
+            out_dir: "./out".into(),
+            max_concurrent: None,
+            max_download_speed: None,
+        }
+    }
 }
