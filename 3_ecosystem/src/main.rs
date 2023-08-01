@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::{
     io::{Cursor, ErrorKind},
     path::{Path, PathBuf},
