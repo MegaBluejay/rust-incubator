@@ -136,7 +136,7 @@ async fn process_image<'a, F: FnOnce() -> ClientResult<'a>>(
 
     let out_data = tokio_rayon::spawn(move || process_data(&in_data, quality)).await?;
 
-    let mut out_file = create_out_file(out_dir.as_ref(), name).await?;
+    let mut out_file = create_out_file(out_dir.as_ref(), name, "jpg").await?;
 
     out_file
         .write_all(&out_data)
@@ -147,10 +147,14 @@ async fn process_image<'a, F: FnOnce() -> ClientResult<'a>>(
 }
 
 #[instrument]
-async fn create_out_file(out_dir: &Path, name: &str) -> Result<File, std::io::Error> {
+async fn create_out_file(
+    out_dir: &Path,
+    name: &str,
+    extension: &str,
+) -> Result<File, std::io::Error> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
-    for out_path in out_paths(out_dir, name) {
+    for out_path in out_paths(out_dir, name, extension) {
         match options.open(&out_path).await {
             Ok(file) => {
                 info!(?out_path);
@@ -165,29 +169,31 @@ async fn create_out_file(out_dir: &Path, name: &str) -> Result<File, std::io::Er
     unreachable!()
 }
 
-struct OutNames {
-    name: String,
+struct OutNames<'a> {
+    name: &'a str,
+    extension: &'a str,
     i: u32,
 }
 
-impl Iterator for OutNames {
+impl<'a> Iterator for OutNames<'a> {
     type Item = String;
 
     fn next(&mut self) -> Option<Self::Item> {
         let res = if self.i == 0 {
-            format!("{}.jpg", self.name)
+            format!("{}.{}", self.name, self.extension)
         } else {
-            format!("{}({}).jpg", self.name, self.i)
+            format!("{}({}).{}", self.name, self.i, self.extension)
         };
         self.i += 1;
         Some(res)
     }
 }
 
-impl OutNames {
-    fn new(name: impl Into<String>) -> Self {
+impl<'a> OutNames<'a> {
+    fn new(name: &'a str, extension: &'a str) -> Self {
         Self {
-            name: name.into(),
+            name,
+            extension,
             i: 0,
         }
     }
@@ -195,9 +201,10 @@ impl OutNames {
 
 fn out_paths<'a>(
     out_dir: &'a Path,
-    name: impl Into<String> + 'a,
+    name: &'a str,
+    extension: &'a str,
 ) -> impl Iterator<Item = PathBuf> + 'a {
-    OutNames::new(name).map(|out_name| out_dir.join(out_name))
+    OutNames::new(name, extension).map(|out_name| out_dir.join(out_name))
 }
 
 #[instrument(skip(in_data))]
