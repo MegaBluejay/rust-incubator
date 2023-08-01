@@ -27,7 +27,7 @@ use tokio::{
     fs::{self, File, OpenOptions},
     io::{AsyncReadExt, AsyncWriteExt},
 };
-use tracing::{info, instrument, trace_span, Instrument};
+use tracing::{debug_span, info, instrument, Instrument};
 use tracing_subscriber::{fmt::format::FmtSpan, prelude::*, EnvFilter};
 
 use config::{Cli, Config, SourceEnum};
@@ -156,10 +156,10 @@ async fn process_image<'a, F: FnOnce() -> ClientResult<'a>>(
     let mut in_data = vec![];
     in_image
         .open(client_getter)
-        .instrument(trace_span!("open"))
+        .instrument(debug_span!("open"))
         .await?
         .read_to_end(&mut in_data)
-        .instrument(trace_span!("read"))
+        .instrument(debug_span!("read"))
         .await?;
 
     let (out_data, format) =
@@ -169,7 +169,7 @@ async fn process_image<'a, F: FnOnce() -> ClientResult<'a>>(
 
     out_file
         .write_all(&out_data)
-        .instrument(trace_span!("write"))
+        .instrument(debug_span!("write"))
         .await?;
 
     Ok(())
@@ -242,19 +242,19 @@ fn process_data(
     quality: u8,
     png_compression: png::CompressionType,
 ) -> Result<(Vec<u8>, ImageFormat)> {
-    let format = trace_span!("detect").in_scope(|| match imghdr::from_bytes(in_data) {
+    let format = debug_span!("detect").in_scope(|| match imghdr::from_bytes(in_data) {
         Some(imghdr::Type::Png) => Ok(ImageFormat::Png),
         Some(imghdr::Type::Jpeg) => Ok(ImageFormat::Jpeg),
         Some(other) => Err(anyhow!("unsupported format: {:?}", other)),
         None => Err(anyhow!("unknown format")),
     })?;
 
-    let image = trace_span!("decode").in_scope(|| match &format {
+    let image = debug_span!("decode").in_scope(|| match &format {
         ImageFormat::Jpeg => DynamicImage::from_decoder(JpegDecoder::new(in_data)?),
         ImageFormat::Png => DynamicImage::from_decoder(PngDecoder::new(in_data)?),
     })?;
 
-    let out_data = trace_span!("encode").in_scope(|| {
+    let out_data = debug_span!("encode").in_scope(|| {
         let mut buffer = Cursor::new(vec![]);
         match &format {
             ImageFormat::Jpeg => image.write_to(&mut buffer, ImageOutputFormat::Jpeg(quality)),
