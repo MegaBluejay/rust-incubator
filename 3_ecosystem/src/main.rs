@@ -43,7 +43,7 @@ async fn main() -> Result<()> {
         .with(EnvFilter::from_default_env())
         .init();
 
-    let (config, source) = get_config()?;
+    let (config, source) = Cli::try_parse().map_err(Into::into).and_then(get_config)?;
 
     info!(?config);
 
@@ -82,12 +82,12 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn get_config() -> Result<(Config, SourceEnum)> {
+fn get_config(cli: Cli) -> Result<(Config, SourceEnum)> {
     let Cli {
         config: cli_config,
         config_file,
         source,
-    } = Cli::try_parse()?;
+    } = cli;
 
     let mut figment = Figment::new().merge(Serialized::defaults(Config::default()));
     if let Some(config_file) = &config_file {
@@ -274,4 +274,39 @@ fn process_data(
         }
     }?;
     Ok((buffer.into_inner(), format))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::{OptionalConfig, Source};
+
+    use super::*;
+
+    #[test]
+    fn config_priority() {
+        figment::Jail::expect_with(|jail| {
+            let config_file = "config.yaml".into();
+
+            jail.create_file(&config_file, "jpeg_quality: 10")?;
+            jail.set_env("STEP3_JPEG_QUALITY", "20");
+
+            let cli = Cli {
+                config: OptionalConfig {
+                    jpeg_quality: Some(30),
+                    ..Default::default()
+                },
+                source: Source {
+                    input_file: Some(patharg::InputArg::Path("image.png".into())),
+                    image: None,
+                },
+                config_file: Some(config_file),
+            };
+
+            let (config, _source) = get_config(cli).unwrap();
+
+            assert_eq!(config.jpeg_quality, 30);
+
+            Ok(())
+        });
+    }
 }

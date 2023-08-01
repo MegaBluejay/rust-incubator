@@ -23,8 +23,8 @@ pub struct Cli {
 #[group(required = true, multiple = false)]
 pub struct Source {
     #[arg(short = 'f', long)]
-    input_file: Option<InputArg>,
-    image: Option<Vec<InputImage>>,
+    pub input_file: Option<InputArg>,
+    pub image: Option<Vec<InputImage>>,
 }
 
 pub enum SourceEnum {
