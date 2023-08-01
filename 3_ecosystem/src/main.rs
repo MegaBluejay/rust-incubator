@@ -250,7 +250,8 @@ mod tests {
                 config_file: Some(config_file),
             };
 
-            let (config, _source) = get_config(cli).unwrap();
+            let (config, _source) = get_config(cli)
+                .map_err(|_| figment::Error::from("config parsing error".to_owned()))?;
 
             assert_eq!(config.jpeg_quality, 30);
             assert_eq!(config.png_compression, CompressionType::Best);
