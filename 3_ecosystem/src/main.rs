@@ -242,38 +242,37 @@ fn process_data(
     quality: u8,
     png_compression: png::CompressionType,
 ) -> Result<(Vec<u8>, ImageFormat)> {
-    let detect_span = trace_span!("detect").entered();
-    let format = match imghdr::from_bytes(in_data) {
+    let format = trace_span!("detect").in_scope(|| match imghdr::from_bytes(in_data) {
         Some(imghdr::Type::Png) => Ok(ImageFormat::Png),
         Some(imghdr::Type::Jpeg) => Ok(ImageFormat::Jpeg),
         Some(other) => Err(anyhow!("unsupported format: {:?}", other)),
         None => Err(anyhow!("unknown format")),
-    }?;
-    detect_span.exit();
+    })?;
 
-    let decode_span = trace_span!("decode").entered();
-    let image = match &format {
+    let image = trace_span!("decode").in_scope(|| match &format {
         ImageFormat::Jpeg => DynamicImage::from_decoder(JpegDecoder::new(in_data)?),
         ImageFormat::Png => DynamicImage::from_decoder(PngDecoder::new(in_data)?),
-    }?;
-    decode_span.exit();
+    })?;
 
-    let _encode_span = trace_span!("encode").entered();
-    let mut buffer = Cursor::new(vec![]);
-    match &format {
-        ImageFormat::Jpeg => image.write_to(&mut buffer, ImageOutputFormat::Jpeg(quality)),
-        ImageFormat::Png => {
-            let encoder =
-                PngEncoder::new_with_quality(&mut buffer, png_compression, Default::default());
-            encoder.write_image(
-                image.as_bytes(),
-                image.width(),
-                image.height(),
-                image.color(),
-            )
-        }
-    }?;
-    Ok((buffer.into_inner(), format))
+    let out_data = trace_span!("encode").in_scope(|| {
+        let mut buffer = Cursor::new(vec![]);
+        match &format {
+            ImageFormat::Jpeg => image.write_to(&mut buffer, ImageOutputFormat::Jpeg(quality)),
+            ImageFormat::Png => {
+                let encoder =
+                    PngEncoder::new_with_quality(&mut buffer, png_compression, Default::default());
+                encoder.write_image(
+                    image.as_bytes(),
+                    image.width(),
+                    image.height(),
+                    image.color(),
+                )
+            }
+        }?;
+        Ok::<Vec<u8>, anyhow::Error>(buffer.into_inner())
+    })?;
+
+    Ok((out_data, format))
 }
 
 #[cfg(test)]
