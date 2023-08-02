@@ -6,7 +6,7 @@ use anyhow::Result;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::get;
+use axum::routing::post;
 use axum::{Json, Router};
 use clap::{Parser, Subcommand};
 use email_address::EmailAddress;
@@ -107,7 +107,7 @@ enum Delete {
 async fn main() -> Result<()> {
     let db = Arc::new(Database::connect(env::var("DATABASE_URL")?).await?);
 
-    let app = Router::new().route("/", get(handler)).with_state(db);
+    let app = Router::new().route("/", post(handler)).with_state(db);
 
     axum::Server::bind(&"0.0.0.0:3000".parse()?)
         .serve(app.into_make_service())

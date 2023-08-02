@@ -10,4 +10,6 @@ members = [
     "4_backend",
     "4_backend/4_*",
     "4_backend/4_1_db/migration",
+    "4_backend/4_2_http/migration",
+    "4_backend/4_2_http/client",
 ]
