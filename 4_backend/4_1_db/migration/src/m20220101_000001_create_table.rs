@@ -61,12 +61,14 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .from(UsersRoles::Table, UsersRoles::UserId)
-                            .to(Users::Table, Users::Id),
+                            .to(Users::Table, Users::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(UsersRoles::Table, UsersRoles::RoleSlug)
-                            .to(Roles::Table, Roles::Slug),
+                            .to(Roles::Table, Roles::Slug)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )
