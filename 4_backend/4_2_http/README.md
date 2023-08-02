@@ -1,101 +1,135 @@
-Step 4.2: HTTP servers and clients
-==================================
+Step 4.1: Databases, connection pools and ORMs
+==============================================
 
 __Estimated time__: 1 day
 
-The current situation regarding [HTTP] in [Rust] ecosystem can be grasped quite well in [the "Web programming" section of "Awesome Rust"][1] and in the ["Web Frameworks"][2], ["HTTP Clients"][3] and ["Lower Web-Stack" topics of "Are we web yet?"][4]. Of course, most of them use [async I/O][5].
+The current situation with databases integration in [Rust] ecosystem is illustrated quite well in [this "Awesome Rust" section][1] and in ["Database" topic of "Are we web yet?"][2]: the majority of the drivers are implemented fully in [Rust], and only few wrap existing libraries, and of course, most of them use [async I/O][3].
 
 
 
 
-## Low-level
+## Connection pool
 
-There are few core crates, providing general-purpose [HTTP] implementation, powering the whole variety of [web frameworks][21] and [HTTP] clients in [Rust] ecosystem.
+The important concept to understand is a [connection pool][11] pattern. It's widely adopted in situations where a program represents a long-running application (like [daemons][12] or [servers][13]). The key point is that __instead of creating a new connection to database every time__ we need to interact with, we'd __rather pre-create a [pool][14] of such connections and reuse them__. As connection creation is quite an expensive operation, applying this pattern leads to huge performance improvements.
 
-The most prominent and mature one is, of course, the [`hyper`] crate (built using [`tokio`]). Almost all [web frameworks][21] of [Rust] ecosystem are built on top of it.
+Fortunately, [Rust] ecosystem provides generic implementations of database-agnostic [connection pool][1] in both flavours: synchronous and asynchronous.
 
-The main alternatives are:
-- [`async-h1`], powering the [`async-std`] ecosystem for [HTTP].
-- [`actix-http`], powering the [`actix-web`] ecosystem.
+For better understanding [connection pooling][1], read through the following articles:
+- [Charlie Custer: What is Connection Pooling, and Why Should You Care][15]
+
+
+### Synchronous
+
+For synchronous connections there is the [`r2d2`] crate (the pioneer among such crates, existed far before [async I/O][3] has landed in [Rust]). You can easily adopt it for your specific use-case (or database) just by implementing [its traits][22]. Obviously, there are [implementations for common drivers][21] already.
 
 For more details, read through the following articles:
-- [Official `hyper` crate docs][`hyper`]
-- [Official `async-h1` crate docs][`async-h1`]
-- [Official `actix-http` crate docs][`actix-http`]
+- [Official `r2d2` crate docs][`r2d2`]
+
+
+### Asynchronous
+
+For asynchronous connections there are much more options in [Rust] ecosystem, due to historical reasons and bigger competitiveness (as the result of bigger [async I/O][3] popularity).
+
+The very first one, historically, was the [`bb8`] crate. It mirrors the [`r2d2`] crate for asynchronous connections ([`tokio`] only), and originally was based on it. Similarly, there are [implemented bridges for common drivers][23] already.
+
+[`deadpool`] is an [alternative and very mature][25] implementation of the [connection pool][11] pattern, supporting both [`tokio`] and [`async-std`], provided with [its own large ecosystem][24].
+
+Another alternative implementation is the [`mobc`] crate, yet inspired by [`deadpool`] and [`r2d2`] crates. Similarly, supports both [`tokio`] and [`async-std`] and provides some [bridges for common drivers][26].
+
+[`qp`] (Quick Pool) is a very simple and [limited][29] implementation of the [connection pool][11] pattern, [utilizing lock-free primitives][27] and [focused on being performant][28].
+
+For more details, read through the following articles:
+- [Official `bb8` crate docs][`bb8`]
+- [Official `deadpool` crate docs][`deadpool`]
+- [Official `mobc` crate docs][`mobc`]
+- [Official `qp` crate docs][`qp`]
 
 
 
 
-## Server
+## Query builder
 
-While [`hyper`] provides its own server implementation, using it directly can feel quite low-level and unergonomic, due to its nature. Naturally, there are [numerous web frameworks][2] built on top of [`hyper`], which provide high-level, ergonomic and friendly interface. The most notable are:
-- [`axum`] - a [web application framework][21] that focuses on ergonomics and modularity, and provides macro-free request routing (yet ergonomic and declarative), simple and predictive error-handling, and leverages full advantage of the [`tower`] and [`tower-http`] ecosystem of [middleware][22], services, and utilities.
-- [`warp`] - a super-easy, composable, [web server framework][21] for warp speeds, built around the "everything is a [`Filter`]" concept.
-- [`rocket`] - a [web framework][21], aims to be fast, easy, and flexible while offering guaranteed safety and security where it can, and, importantly, aiming to be fun (accomplishing this by ensuring that you write as little code as needed to accomplish your task).
-- [`poem`] - a full-featured and easy-to-use [web framework][21], focusing on providing all the capabilities (like [i18n]) out-of-the-box.
-- [`salvo`] - a powerful and simple [web server framework][21], adopting [HTTP/3] implementation.
+Query builder is effectively a __[builder pattern][81] applied for building [SQL]__ (or other [data query languages][82]) queries, and __allowing to write them as a regular [Rust] code__ (and so, [using an embedded DSL instead of external DSL][83]).
 
-For those who prefer [`async-std`] ecosystem, the definitive choice (and the single one, at the moment) is the [`tide`] crate.
+The canonical implementation of this pattern in [Rust] ecosystem is represented by [`sea-query`] and [`sql_query_builder`] crates.
 
-All the [web frameworks][21] above inherit the [work-stealing][23] from the asynchronous runtime they're run on, and so, require the proper synchronization (being [`Send`]) from user-provided [HTTP] request handlers, which may introduce an unnecessary or undesired overhead. That's why __[`actix-web`] crate was designed__ and implemented specifically with this consideration in mind (__to avoid [work-stealing][23]__), being built on top of [`actix-rt`] crate (leveraging [thread-per-core][24] model), and thus, not requiring any synchronization in its request handlers (allowing `!Send` [`Future`]s). Also, [`actix-web`], at the time, was the first mature and production-ready [web framework][21] in [Rust] ecosystem, possessing a [top of "TechEmpower Web Framework Benchmarks"][25].
+[`barrel`] crate, on the other hand, allows to write [schema migrations][61], rather than querying data.
 
-For better understanding and familiarity with [HTTP] servers in [Rust], read through the following articles:
-- [Official `actix-web` crate docs][`actix-web`]
-- [Official `actix-web` crate guides: Server](https://actix.rs/docs/server)
-- [Official `axum` crate docs][`axum`]
-- [Official `warp` crate docs][`warp`]
-- [Official `rocket` crate docs][`rocket`]
-- [Official `poem` crate docs][`poem`]
-- [Official `salvo` book](https://salvo.rs/book)
-- [Official `tide` crate docs][`tide`]
-- [Official `hyper` crate guides: Server][26]
+For more details, read through the following articles:
+- [Official `sea-query` crate docs][`sea-query`]
+- [Official `sql_query_builder` crate docs][`sql_query_builder`]
+- [Official `barrel` crate docs][`barrel`]
+
+
+### Non-[DSL] toolkit
+
+[`sqlx`] crate, while being a feature-rich toolkit for [SQL], takes a [completely opposite approach][91] here: it focuses on writing pure [SQL] queries (no custom [DSL], no [query building](#query-builder)), which are statically checked to be correct at compile-time.
+
+For better understanding [`sqlx`] design, concepts, usage, and features, read through the following articles:
+- [Official `sqlx` crate docs][`sqlx`]
 
 
 
 
-## Client
+## ORM
 
-Similarly to a server, while [`hyper`] provides its own client implementation, using it directly can feel quite low-level and unergonomic. So, the "default choice" [HTTP] client (and mostly used) in [Rust] ecosystem is the [`reqwest`] crate, built on top of [`hyper`].
+Regarding the [ORM pattern][41], there are [multiple][42] feature-rich and mature implementation in [Rust] ecosystem at the moment. Every one has its own unique design, advantages and disadvantages.
 
-[`isahc`] crate, as an alternative, is a runtime-agnostic wrapper (with major focus on being practical and ergonomic) around the famous [cURL] library.
+The very first [ORM][41] created in [Rust] was the [`diesel`] crate. Even now, it supports [only synchronous][43] connections (as was created before [async I/O][3] has landed in [Rust]). However, still may be used with asynchronous connections, thankfully to the [`diesel-async`] extension.
 
-For simple and trivial scenarios, __where an asynchronous runtime is redundant__ and/or low overhead is preferred, the viable alternative is the [`ureq`] crate.
+[`sea-orm`] (built on top of [`sea-query`]) is an alternative feature-rich and [mature][46] implementation of the [ORM] pattern in [Rust], focused on [dynamic querying to avoid complexity of static checks ("fighting the ORM")][47].
 
-For [`async-std`] ecosystem, the main crate is [`surf`], which is, however, not restricted to [`async-std`] only, and is able to use alternative backends: [cURL] (via [`isahc`]), [`hyper`], [WASM] (via [browser's `window.fetch` API][32]).
+[`ormx`] is a lightweight extension of the [`sqlx`] crate, aimed to provide it with [ORM][41]-like features.
 
-For [`actix-web`] ecosystem, the meaningful option would be the [`awc`] crate, which supports [WebSocket] connections out-of-the-box (while most other [HTTP] clients lacks that).
+[`rustorm`] is a very simple and [SQL]-centered [ORM][41], focused on easing conversions of database types to their appropriate [Rust] types.
 
-For better understanding and familiarity with [HTTP] clients in [Rust], read through the following articles:
-- [Official `reqwest` crate docs][`reqwest`]
-- [Official `isahc` crate docs][`isahc`]
-- [Official `ureq` crate docs][`ureq`]
-- [Official `surf` crate docs][`surf`]
-- [Official `awc` crate docs][`awc`]
-- [Official `hyper` crate guides: Client][31]
-
-
+For better understanding [ORMs][41] design, concepts, usage, and features, read through the following articles:
+- [Official `diesel` crate docs][`diesel`]
+- [Official `diesel` crate guides][44]
+- [Official `sea-orm` crate docs][`sea-orm`]
+- [Official `sea-orm` crate guides][45]
+- [Official `ormx` crate docs][`ormx`]
+- [Official `rustorm` crate docs][`rustorm`]
 
 
-## WebSocket
 
-Many [HTTP] clients and servers in [Rust] lack a built-in [WebSocket] implementation. Therefore, the [`tungstenite`] crate was created, providing a barebone and agnostic [WebSocket] implementation. Crates, like [`async-tungstenite`] and [`tokio-tungstenite`], provide the actual ready-for-use client/server implementation for the desired ecosystem and asynchronous runtime.
 
-For [`actix-web`] ecosystem, the idiomatic solution is the [`actix-web-actors::ws`] module, providing implementation in a form of [actor][41] (via [`actix`]).
+## Migrations
 
-For better understanding and familiarity with [WebSocket] implementations in [Rust], read through the following articles:
-- [Official `tungstenite` crate docs][`tungstenite`]
-- [Official `async-tungstenite` crate docs][`async-tungstenite`]
-- [Official `tokio-tungstenite` crate docs][`tokio-tungstenite`]
-- [Official `actix-web-actors::ws` module docs][`actix-web-actors::ws`]
+For [database migrations][61] there are [multiple tools][62] in [Rust] ecosystem.
+
+For [`diesel`] users, the obvious choice is the [`diesel_migrations`] crate (which may be used directly via [`diesel_cli`]). Though, doesn't require the [`diesel`] itself to be used, and may be used as a fully separate tool.
+
+For [`sqlx`] users, similarly, the [`sqlx-cli`] tool [provides migrations][64] out-of-the-box, while also may be used [directly in the application code][65].
+
+[`refinery`] and [`migrant`] are another standalone [Rust] tools for [migrations][61], allowing both [CLI] and ["in-application-code"][66] usage. The interesting part about the [`refinery`] crate is that it also allows to write "in-application-code" [migrations][61] via the [`barrel`] schema migration builder.
+
+For being familiar with [migrations][61] tools, their similarities and differences, read through the following articles:
+- [Official `diesel_migrations` crate docs][`diesel_migrations`]
+- [Official `diesel_cli` crate docs][`diesel_cli`]
+- [Official `diesel` crate guides: Getting Started][63]
+- [Official `sqlx` crate docs: Macro `sqlx::migrate`][65]
+- [Official `refinery` crate docs][`refinery`]
+- [Official `migrant` crate docs][`migrant`]
 
 
 
 
 ## Task
 
-Rework [the task from the previous step](../4_1_db/README.md#task) in a [client-server architecture][51]. It should consist of a [CLI] client and a server [daemon][52], and utilize the ["thin client" approach][53]:
-- [CLI] client does nothing except sending commands "as is" to the server and rendering its responses.
-- Server [daemon][52], having a single [HTTP] endpoint, does all the parsing and executing of commands sent by the [CLI] client.
+Create an [SQL] database ([PostgreSQL], [MySQL] or [SQLite], on your choice) consisting of the following tables:
+- `users`: `id`, `name` and any other fields on your choice; 
+- `roles`: [`slug`][201] as a primary key, `name` and `permissions` (the concrete format on your choice) fields;
+- `users_roles`: `users.id` to `roles.slug` many-to-many relationship.
+
+Write a simple [CLI] application which allows to [CRUD] data in your database tables in the following ways:
+- create and delete `users` and `roles` (a `user` must always have an assigned `role`);
+- update fields of a single `user` or a `role`;
+- assign or unassign a `role` to/from a `user`;
+- list all `roles` or a single `role` by its `slug`;
+- list all `users` or a single `user` by its `id` (a `user` should be displayed with all the `roles` assigned to him).
+
+Consider to ensure [data consistency][202] in your database as much as possible.
 
 
 
@@ -103,65 +137,78 @@ Rework [the task from the previous step](../4_1_db/README.md#task) in a [client-
 ## Questions
 
 After completing everything above, you should be able to answer (and understand why) the following questions:
-- What is HTTP? What does HTTP/2 imply? What does HTTP/3 imply?
-- How do work-stealing and thread-per-core paradigms affect programming a web server in practice? Which one is better and when? When does this question (choosing) become meaningful, in practice?
-- What are common crates for making HTTP requests in [Rust]? Which trade-offs do they have?
-- What is WebSocket? How is it used and when? How does it work, in a nutshell?
+- What is connection pool pattern? How does it work? Which problems does it solve?
+- What is ORM pattern? How does it differ from query building? What benefits do they give?
+- Why writing raw SQL queries could be meaningful? Which are use-cases for it and when is it preferred over ORMs?
+- What are migrations? Why should we use them? How do they work? 
+- Which kinds of migrations do exist? What are their advantages and disadvantages? When and which kind is preferred?  
 
 
 
 
-[`actix`]: https://docs.rs/actix
-[`actix-http`]: https://docs.rs/actix-http
-[`actix-rt`]: https://docs.rs/actix-rt
-[`actix-web`]: https://docs.rs/actix-web
-[`actix-web-actors::ws`]: https://docs.rs/actix-web-actors/latest/actix_web_actors/ws/index.html
-[`async-h1`]: https://docs.rs/async-h1
 [`async-std`]: https://docs.rs/async-std
-[`async-tungstenite`]: https://docs.rs/crate/async-tungstenite
-[`awc`]: https://docs.rs/awc
-[`axum`]: https://docs.rs/axum
-[`Filter`]: https://docs.rs/warp/latest/warp/trait.Filter.html
-[`Future`]: https://doc.rust-lang.org/stable/std/future/trait.Future.html
-[`hyper`]: https://docs.rs/hyper
-[`isahc`]: https://docs.rs/isahc
-[`poem`]: https://docs.rs/poem
-[`reqwest`]: https://docs.rs/reqwest
-[`rocket`]: https://docs.rs/rocket
-[`salvo`]: https://docs.rs/salvo
-[`surf`]: https://docs.rs/surf
-[`tower`]: https://docs.rs/tower
-[`tower-http`]: https://docs.rs/tower-http
-[`tungstenite`]: https://docs.rs/crate/tungstenite
-[`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
-[`tide`]: https://docs.rs/tide
+[`barrel`]: https://docs.rs/barrel
+[`bb8`]: https://docs.rs/bb8
+[`deadpool`]: https://docs.rs/deadpool
+[`diesel`]: https://docs.rs/diesel
+[`diesel_cli`]: https://docs.rs/diesel_cli
+[`diesel_migrations`]: https://docs.rs/diesel_migrations
+[`diesel-async`]: https://docs.rs/diesel-async
+[`migrant`]: https://docs.rs/migrant
+[`mobc`]: https://docs.rs/mobc
+[`ormx`]: https://docs.rs/ormx
+[`qp`]: https://github.com/Astro36/qp
+[`r2d2`]: https://docs.rs/r2d2
+[`refinery`]: https://docs.rs/refinery
+[`rustorm`]: https://docs.rs/crate/rustorm
+[`sea-orm`]: https://docs.rs/sea-orm
+[`sea-query`]: https://docs.rs/sea-query
+[`sql_query_builder`]: https://docs.rs/sql_query_builder
+[`sqlx`]: https://docs.rs/crate/sqlx
+[`sqlx-cli`]: https://docs.rs/crate/sqlx-cli
 [`tokio`]: https://docs.rs/tokio
-[`tokio-tungstenite`]: https://docs.rs/crate/tokio-tungstenite
-[`ureq`]: https://docs.rs/ureq
-[`warp`]: https://docs.rs/warp
 [CLI]: https://en.wikipedia.org/wiki/Command-line_interface
-[cURL]: https://en.wikipedia.org/wiki/CURL
-[HTTP]: https://en.wikipedia.org/wiki/HTTP
-[HTTP/3]: https://en.wikipedia.org/wiki/HTTP/3
-[i18n]: https://en.wikipedia.org/wiki/Internationalization_and_localization
+[CRUD]: https://en.wikipedia.org/wiki/Create,_read,_update_and_delete
+[DSL]: https://en.wikipedia.org/wiki/Domain-specific_language
+[MySQL]: https://www.mysql.com
+[PostgreSQL]: https://www.postgresql.org
 [Rust]: https://www.rust-lang.org
-[WASM]: https://en.wikipedia.org/wiki/WebAssembly
-[WebSocket]: https://en.wikipedia.org/wiki/WebSocket
+[SQL]: https://en.wikipedia.org/wiki/SQL
+[SQLite]: https://www.sqlite.org
 
-[1]: https://github.com/rust-unofficial/awesome-rust#web-programming
-[2]: https://www.arewewebyet.org/topics/frameworks
-[3]: https://www.arewewebyet.org/topics/http-clients
-[4]: https://www.arewewebyet.org/topics/lower-web-stack
-[5]: ../../3_ecosystem/3_11_async
-[21]: https://en.wikipedia.org/wiki/Web_framework
-[22]: https://en.wikipedia.org/wiki/Middleware
-[23]: https://en.wikipedia.org/wiki/Work_stealing
-[24]: https://www.datadoghq.com/blog/engineering/introducing-glommio
-[25]: https://www.techempower.com/benchmarks#hw=ph&test=plaintext&section=data-r18
-[26]: https://hyper.rs/guides/server/hello-world
-[31]: https://hyper.rs/guides/client/basic
-[32]: https://developer.mozilla.org/docs/Web/API/Fetch_API
-[41]: https://en.wikipedia.org/wiki/Actor_model
-[51]: https://en.wikipedia.org/wiki/Client%E2%80%93server_model
-[52]: https://en.wikipedia.org/wiki/Daemon_(computing)
-[53]: https://en.wikipedia.org/wiki/Thin_client
+[1]: https://github.com/rust-unofficial/awesome-rust#database-1
+[2]: https://www.arewewebyet.org/topics/database
+[3]: ../../3_ecosystem/3_11_async
+[11]: https://en.wikipedia.org/wiki/Connection_pool
+[12]: https://en.wikipedia.org/wiki/Daemon_(computing)
+[13]: https://en.wikipedia.org/wiki/Server_(computing)
+[14]: https://en.wikipedia.org/wiki/Object_pool_pattern
+[15]: https://www.cockroachlabs.com/blog/what-is-connection-pooling
+[21]: https://crates.io/search?q=r2d2
+[22]: https://docs.rs/r2d2#traits
+[23]: https://crates.io/search?q=bb8
+[24]: https://crates.io/search?q=deadpool
+[25]: https://docs.rs/deadpool#reasons-for-yet-another-connection-pool
+[26]: https://crates.io/search?q=mobc
+[27]: https://github.com/Astro36/qp#bb8-vs-qp
+[28]: https://github.com/Astro36/qp#performance-comparison
+[29]: https://github.com/Astro36/qp#dbcp
+[41]: https://en.wikipedia.org/wiki/Object-relational_mapping
+[42]: https://www.arewewebyet.org/topics/database#orms
+[43]: https://github.com/diesel-rs/diesel/issues/399
+[44]: https://diesel.rs/guides
+[45]: https://www.sea-ql.org/SeaORM/docs/index
+[46]: https://docs.rs/sea-orm#whos-using-seaorm
+[47]: https://www.sea-ql.org/SeaORM/docs/internal-design/diesel#programming-paradigm
+[61]: https://en.wikipedia.org/wiki/Schema_migration
+[62]: https://www.arewewebyet.org/topics/database#tooling
+[63]: https://diesel.rs/guides/getting-started
+[64]: https://github.com/launchbadge/sqlx/tree/main/sqlx-cli#create-and-run-migrations
+[65]: https://docs.rs/sqlx/latest/sqlx/macro.migrate.html
+[66]: https://docs.rs/refinery/latest/refinery/macro.embed_migrations.html
+[81]: https://en.wikipedia.org/wiki/Builder_pattern
+[82]: https://en.wikipedia.org/wiki/Query_language
+[83]: https://en.wikipedia.org/wiki/Domain-specific_language#External_and_Embedded_Domain_Specific_Languages
+[91]: https://github.com/launchbadge/sqlx#sqlx-is-not-an-orm
+[201]: https://en.wikipedia.org/wiki/Clean_URL#Slug 
+[202]: https://en.wikipedia.org/wiki/Consistency_(database_systems)

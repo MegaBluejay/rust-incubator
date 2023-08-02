@@ -4113,6 +4113,13 @@ dependencies = [
 [[package]]
 name = "step_4_2"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "email_address",
+ "sea-orm",
+ "tokio",
+]
 
 [[package]]
 name = "step_4_3"
