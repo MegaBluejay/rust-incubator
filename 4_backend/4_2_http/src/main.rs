@@ -1,18 +1,20 @@
+use std::io::Write;
 use std::{env, num::NonZeroU16};
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use email_address::EmailAddress;
+use sea_orm::sea_query::OnConflict;
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, Database, DbErr, EntityTrait,
+    ModelTrait, PaginatorTrait, QueryFilter, QuerySelect, TransactionError, TransactionTrait,
+};
+use thiserror::Error;
 
 mod entities;
 
 use entities::roles::Permissions;
 use entities::{prelude::*, roles, users, users_roles};
-use sea_orm::sea_query::OnConflict;
-use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, Database, DbErr, EntityTrait,
-    ModelTrait, PaginatorTrait, QueryFilter, QuerySelect, TransactionTrait,
-};
 
 #[derive(Debug, Parser)]
 struct Cli {
@@ -96,62 +98,113 @@ enum Delete {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let Cli { command } = Cli::try_parse()?;
+    // let Cli { command } = Cli::try_parse()?;
 
-    let db = Database::connect(env::var("DATABASE_URL")?).await?;
+    // let db = Database::connect(env::var("DATABASE_URL")?).await?;
 
-    match command {
-        Command::Create(create) => do_create(create, &db).await?,
-        Command::Update(update) => do_update(update, &db).await?,
-        Command::List(list) => do_list(list, &db).await?,
-        Command::Get(get) => do_get(get, &db).await?,
-        Command::Delete(delete) => do_delete(delete, &db).await?,
-    };
+    // match command {
+    //     Command::Create(create) => do_create(create, &db).await?,
+    //     Command::Update(update) => do_update(update, &db).await?,
+    //     Command::List(list) => do_list(list, &db).await?,
+    //     Command::Get(get) => do_get(get, &db).await?,
+    //     Command::Delete(delete) => do_delete(delete, &db).await?,
+    // };
 
     Ok(())
 }
 
-async fn do_list(command: List, db: &impl ConnectionTrait) -> Result<()> {
+#[derive(Debug)]
+enum Entity {
+    User,
+    Role,
+}
+
+#[derive(Debug, Error)]
+enum Error {
+    #[error(transparent)]
+    Db(#[from] DbErr),
+    #[error("{0:?} not found")]
+    NotFound(Entity),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("user can't have no roles")]
+    NoRole,
+}
+
+impl From<TransactionError<Error>> for Error {
+    fn from(value: TransactionError<Error>) -> Self {
+        match value {
+            TransactionError::Connection(db) => Self::Db(db),
+            TransactionError::Transaction(other) => other,
+        }
+    }
+}
+
+impl From<TransactionError<DbErr>> for Error {
+    fn from(value: TransactionError<DbErr>) -> Self {
+        match value {
+            TransactionError::Connection(db) => Self::Db(db),
+            TransactionError::Transaction(db) => Self::Db(db),
+        }
+    }
+}
+
+async fn do_list(
+    command: List,
+    db: &impl ConnectionTrait,
+    writer: &mut impl Write,
+) -> Result<(), Error> {
     match command {
         List::Users => {
             let users = Users::find().find_with_related(Roles).all(db).await?;
             for (user, roles) in users.iter() {
-                print_user(user, roles);
+                print_user(user, roles, writer)?;
             }
         }
         List::Roles => {
             let roles = Roles::find().all(db).await?;
             for role in roles.iter() {
-                print_role(role);
+                print_role(role, writer)?;
             }
         }
     }
     Ok(())
 }
 
-fn print_user<'a>(user: &users::Model, roles: impl IntoIterator<Item = &'a roles::Model>) {
-    println!("ID: {}", user.id);
-    println!("\tName: {}", user.name);
+fn print_user<'a>(
+    user: &users::Model,
+    roles: impl IntoIterator<Item = &'a roles::Model>,
+    writer: &mut impl Write,
+) -> Result<(), Error> {
+    writeln!(writer, "ID: {}", user.id)?;
+    writeln!(writer, "\tName: {}", user.name)?;
     if let Some(email) = user.email.as_ref() {
-        println!("\tEmail: {}", email);
+        writeln!(writer, "\tEmail: {}", email)?;
     }
-    println!(
+    writeln!(
+        writer,
         "\tRoles: {}",
         roles
             .into_iter()
             .map(|role| role.slug.to_owned())
             .collect::<Vec<_>>()
             .join(",")
-    );
+    )?;
+    Ok(())
 }
 
-fn print_role(role: &roles::Model) {
-    println!("Slug: {}", role.slug);
-    println!("\tName: {}", role.name);
-    println!("\tPermissions: {:?}", role.permissions);
+fn print_role(role: &roles::Model, writer: &mut impl Write) -> Result<(), Error> {
+    writeln!(writer, "Slug: {}", role.slug)?;
+    writeln!(writer, "\tName: {}", role.name)?;
+    writeln!(writer, "\tPermissions: {:?}", role.permissions)?;
+    Ok(())
 }
 
-async fn do_get(command: Get, db: &impl ConnectionTrait) -> Result<()> {
+async fn do_get(
+    command: Get,
+    db: &impl ConnectionTrait,
+    writer: &mut impl Write,
+) -> Result<(), Error> {
     match command {
         Get::User { id } => {
             let user = Users::find_by_id(id.get() as i32)
@@ -159,24 +212,27 @@ async fn do_get(command: Get, db: &impl ConnectionTrait) -> Result<()> {
                 .all(db)
                 .await?;
             if let [(user, roles)] = &user[..] {
-                print_user(user, roles);
+                print_user(user, roles, writer)?;
             } else {
-                println!("User not found");
+                return Err(Error::NotFound(Entity::User));
             }
         }
         Get::Role { slug } => {
             let role = Roles::find_by_id(slug).one(db).await?;
             if let Some(role) = role {
-                print_role(&role);
+                print_role(&role, writer)?;
             } else {
-                println!("Role not found");
+                return Err(Error::NotFound(Entity::User));
             }
         }
     }
     Ok(())
 }
 
-async fn do_create(command: Create, db: &(impl ConnectionTrait + TransactionTrait)) -> Result<()> {
+async fn do_create(
+    command: Create,
+    db: &(impl ConnectionTrait + TransactionTrait),
+) -> Result<(), Error> {
     match command {
         Create::User { name, role, email } => {
             db.transaction::<_, (), DbErr>(|txn| {
@@ -218,7 +274,10 @@ async fn do_create(command: Create, db: &(impl ConnectionTrait + TransactionTrai
     Ok(())
 }
 
-async fn do_update(command: Update, db: &(impl ConnectionTrait + TransactionTrait)) -> Result<()> {
+async fn do_update(
+    command: Update,
+    db: &(impl ConnectionTrait + TransactionTrait),
+) -> Result<(), Error> {
     match command {
         Update::User {
             id,
@@ -227,7 +286,7 @@ async fn do_update(command: Update, db: &(impl ConnectionTrait + TransactionTrai
             add_roles,
             remove_roles,
         } => {
-            db.transaction::<_, (), DbErr>(|txn| {
+            db.transaction::<_, (), Error>(|txn| {
                 Box::pin(async move {
                     let user = Users::find_by_id(id.get() as i32).one(txn).await?;
                     if let Some(user) = user {
@@ -268,11 +327,11 @@ async fn do_update(command: Update, db: &(impl ConnectionTrait + TransactionTrai
 
                             let count = user.find_related(Roles).count(txn).await?;
                             if count == 0 {
-                                Err(DbErr::Custom("user has 0 roles".to_owned()))?;
+                                return Err(Error::NoRole);
                             }
                         }
                     } else {
-                        println!("User not found");
+                        return Err(Error::NotFound(Entity::User));
                     }
 
                     Ok(())
@@ -296,20 +355,23 @@ async fn do_update(command: Update, db: &(impl ConnectionTrait + TransactionTrai
                 }
                 role.update(db).await?;
             } else {
-                println!("Role not found");
+                return Err(Error::NotFound(Entity::Role));
             }
         }
     }
     Ok(())
 }
 
-async fn do_delete(command: Delete, db: &(impl ConnectionTrait + TransactionTrait)) -> Result<()> {
+async fn do_delete(
+    command: Delete,
+    db: &(impl ConnectionTrait + TransactionTrait),
+) -> Result<(), Error> {
     match command {
         Delete::User { id } => {
             Users::delete_by_id(id.get() as i32).exec(db).await?;
         }
         Delete::Role { slug } => {
-            db.transaction::<_, (), DbErr>(|txn| {
+            db.transaction::<_, (), Error>(|txn| {
                 Box::pin(async move {
                     let single = UsersRoles::find()
                         .group_by(users_roles::Column::UserId)
@@ -322,9 +384,7 @@ async fn do_delete(command: Delete, db: &(impl ConnectionTrait + TransactionTrai
                         .count(txn)
                         .await?;
                     if single != 0 {
-                        Err(DbErr::Custom(
-                            "role is the only one for some user".to_owned(),
-                        ))?;
+                        return Err(Error::NoRole);
                     }
 
                     Roles::delete_by_id(slug).exec(txn).await?;

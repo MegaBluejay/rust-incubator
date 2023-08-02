@@ -4118,6 +4118,7 @@ dependencies = [
  "clap",
  "email_address",
  "sea-orm",
+ "thiserror",
  "tokio",
 ]
 
