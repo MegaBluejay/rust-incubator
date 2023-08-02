@@ -58,6 +58,16 @@ impl MigrationTrait for Migration {
                             .col(UsersRoles::UserId)
                             .col(UsersRoles::RoleSlug),
                     )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(UsersRoles::Table, UsersRoles::UserId)
+                            .to(Users::Table, Users::Id),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .from(UsersRoles::Table, UsersRoles::RoleSlug)
+                            .to(Roles::Table, Roles::Slug),
+                    )
                     .to_owned(),
             )
             .await
