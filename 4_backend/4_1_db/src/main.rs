@@ -11,7 +11,7 @@ use entities::{prelude::*, roles, users, users_roles};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, Database, DbErr, EntityTrait,
-    QueryFilter, TransactionTrait,
+    ModelTrait, PaginatorTrait, QueryFilter, QuerySelect, TransactionTrait,
 };
 
 #[derive(Debug, Parser)]
@@ -265,6 +265,11 @@ async fn do_update(command: Update, db: &(impl ConnectionTrait + TransactionTrai
                                 .filter(users_roles::Column::RoleSlug.is_in(remove_roles))
                                 .exec(txn)
                                 .await?;
+
+                            let count = user.find_related(Roles).count(txn).await?;
+                            if count == 0 {
+                                Err(DbErr::Custom("user has 0 roles".to_owned()))?;
+                            }
                         }
                     } else {
                         println!("User not found");
@@ -298,13 +303,36 @@ async fn do_update(command: Update, db: &(impl ConnectionTrait + TransactionTrai
     Ok(())
 }
 
-async fn do_delete(command: Delete, db: &impl ConnectionTrait) -> Result<()> {
+async fn do_delete(command: Delete, db: &(impl ConnectionTrait + TransactionTrait)) -> Result<()> {
     match command {
         Delete::User { id } => {
             Users::delete_by_id(id.get() as i32).exec(db).await?;
         }
         Delete::Role { slug } => {
-            Roles::delete_by_id(slug).exec(db).await?;
+            db.transaction::<_, (), DbErr>(|txn| {
+                Box::pin(async move {
+                    let single = UsersRoles::find()
+                        .group_by(users_roles::Column::UserId)
+                        .having(
+                            users_roles::Column::RoleSlug
+                                .count()
+                                .eq(1)
+                                .and(users_roles::Column::RoleSlug.eq(&slug)),
+                        )
+                        .count(txn)
+                        .await?;
+                    if single != 0 {
+                        Err(DbErr::Custom(
+                            "role is the only one for some user".to_owned(),
+                        ))?;
+                    }
+
+                    Roles::delete_by_id(slug).exec(txn).await?;
+
+                    Ok(())
+                })
+            })
+            .await?
         }
     }
     Ok(())
