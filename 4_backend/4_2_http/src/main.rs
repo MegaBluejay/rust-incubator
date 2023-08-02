@@ -1,13 +1,20 @@
 use std::io::Write;
+use std::sync::Arc;
 use std::{env, num::NonZeroU16};
 
 use anyhow::Result;
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
+use axum::routing::get;
+use axum::{Json, Router};
 use clap::{Parser, Subcommand};
 use email_address::EmailAddress;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, Database, DbErr, EntityTrait,
-    ModelTrait, PaginatorTrait, QueryFilter, QuerySelect, TransactionError, TransactionTrait,
+    ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, Database, DatabaseConnection,
+    DbErr, EntityTrait, ModelTrait, PaginatorTrait, QueryFilter, QuerySelect, TransactionError,
+    TransactionTrait,
 };
 use thiserror::Error;
 
@@ -98,19 +105,46 @@ enum Delete {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // let Cli { command } = Cli::try_parse()?;
+    let db = Arc::new(Database::connect(env::var("DATABASE_URL")?).await?);
 
-    // let db = Database::connect(env::var("DATABASE_URL")?).await?;
+    let app = Router::new().route("/", get(handler)).with_state(db);
 
-    // match command {
-    //     Command::Create(create) => do_create(create, &db).await?,
-    //     Command::Update(update) => do_update(update, &db).await?,
-    //     Command::List(list) => do_list(list, &db).await?,
-    //     Command::Get(get) => do_get(get, &db).await?,
-    //     Command::Delete(delete) => do_delete(delete, &db).await?,
-    // };
+    axum::Server::bind(&"0.0.0.0:3000".parse()?)
+        .serve(app.into_make_service())
+        .await?;
 
     Ok(())
+}
+
+async fn handler(
+    State(db): State<Arc<DatabaseConnection>>,
+    Json(args): Json<Vec<String>>,
+) -> Result<Response, Error> {
+    let Cli { command } = Cli::try_parse_from(args)?;
+
+    let db = db.as_ref();
+
+    Ok(match command {
+        Command::Create(command) => do_create(command, db).await?,
+        Command::Update(command) => do_update(command, db).await?,
+        Command::Delete(command) => do_delete(command, db).await?,
+        Command::Get(command) => do_get(command, db).await?,
+        Command::List(command) => do_list(command, db).await?,
+    })
+}
+
+enum Response {
+    None,
+    Output(Vec<u8>),
+}
+
+impl IntoResponse for Response {
+    fn into_response(self) -> axum::response::Response {
+        match self {
+            Self::None => StatusCode::NO_CONTENT.into_response(),
+            Self::Output(out) => out.into_response(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -129,6 +163,14 @@ enum Error {
     Io(#[from] std::io::Error),
     #[error("user can't have no roles")]
     NoRole,
+    #[error(transparent)]
+    Clap(#[from] clap::Error),
+}
+
+impl IntoResponse for Error {
+    fn into_response(self) -> axum::response::Response {
+        (StatusCode::BAD_REQUEST, self.to_string()).into_response()
+    }
 }
 
 impl From<TransactionError<Error>> for Error {
@@ -149,26 +191,23 @@ impl From<TransactionError<DbErr>> for Error {
     }
 }
 
-async fn do_list(
-    command: List,
-    db: &impl ConnectionTrait,
-    writer: &mut impl Write,
-) -> Result<(), Error> {
+async fn do_list(command: List, db: &impl ConnectionTrait) -> Result<Response, Error> {
+    let mut out = vec![];
     match command {
         List::Users => {
             let users = Users::find().find_with_related(Roles).all(db).await?;
             for (user, roles) in users.iter() {
-                print_user(user, roles, writer)?;
+                print_user(user, roles, &mut out)?;
             }
         }
         List::Roles => {
             let roles = Roles::find().all(db).await?;
             for role in roles.iter() {
-                print_role(role, writer)?;
+                print_role(role, &mut out)?;
             }
         }
     }
-    Ok(())
+    Ok(Response::Output(out))
 }
 
 fn print_user<'a>(
@@ -200,11 +239,8 @@ fn print_role(role: &roles::Model, writer: &mut impl Write) -> Result<(), Error>
     Ok(())
 }
 
-async fn do_get(
-    command: Get,
-    db: &impl ConnectionTrait,
-    writer: &mut impl Write,
-) -> Result<(), Error> {
+async fn do_get(command: Get, db: &impl ConnectionTrait) -> Result<Response, Error> {
+    let mut out = vec![];
     match command {
         Get::User { id } => {
             let user = Users::find_by_id(id.get() as i32)
@@ -212,7 +248,7 @@ async fn do_get(
                 .all(db)
                 .await?;
             if let [(user, roles)] = &user[..] {
-                print_user(user, roles, writer)?;
+                print_user(user, roles, &mut out)?;
             } else {
                 return Err(Error::NotFound(Entity::User));
             }
@@ -220,19 +256,19 @@ async fn do_get(
         Get::Role { slug } => {
             let role = Roles::find_by_id(slug).one(db).await?;
             if let Some(role) = role {
-                print_role(&role, writer)?;
+                print_role(&role, &mut out)?;
             } else {
                 return Err(Error::NotFound(Entity::User));
             }
         }
     }
-    Ok(())
+    Ok(Response::Output(out))
 }
 
 async fn do_create(
     command: Create,
     db: &(impl ConnectionTrait + TransactionTrait),
-) -> Result<(), Error> {
+) -> Result<Response, Error> {
     match command {
         Create::User { name, role, email } => {
             db.transaction::<_, (), DbErr>(|txn| {
@@ -271,13 +307,13 @@ async fn do_create(
             .await?;
         }
     }
-    Ok(())
+    Ok(Response::None)
 }
 
 async fn do_update(
     command: Update,
     db: &(impl ConnectionTrait + TransactionTrait),
-) -> Result<(), Error> {
+) -> Result<Response, Error> {
     match command {
         Update::User {
             id,
@@ -359,13 +395,13 @@ async fn do_update(
             }
         }
     }
-    Ok(())
+    Ok(Response::None)
 }
 
 async fn do_delete(
     command: Delete,
     db: &(impl ConnectionTrait + TransactionTrait),
-) -> Result<(), Error> {
+) -> Result<Response, Error> {
     match command {
         Delete::User { id } => {
             Users::delete_by_id(id.get() as i32).exec(db).await?;
@@ -395,5 +431,5 @@ async fn do_delete(
             .await?
         }
     }
-    Ok(())
+    Ok(Response::None)
 }
