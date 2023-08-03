@@ -15,6 +15,8 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use utoipa::{OpenApi, ToSchema};
+use utoipa_swagger_ui::SwaggerUi;
 
 mod entities;
 
@@ -26,6 +28,7 @@ async fn main() -> Result<()> {
     let db = Arc::new(Database::connect(env::var("DATABASE_URL")?).await?);
 
     let app = Router::new()
+        .merge(SwaggerUi::new("/swagger").url("/openapi.json", ApiDoc::openapi()))
         .route("/users", get(list_users).post(create_user))
         .route(
             "/users/:id",
@@ -45,6 +48,15 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+#[utoipa::path(
+    post,
+    path = "/users",
+    request_body = CreateUser,
+    responses(
+        (status = 201, description = "User Created", body = UserWithRoles),
+    ),
+    tag = "user",
+)]
 async fn create_user(
     State(db): State<Arc<DatabaseConnection>>,
     Json(user): Json<CreateUser>,
@@ -87,6 +99,15 @@ async fn create_user(
     ))
 }
 
+#[utoipa::path(
+    post,
+    path = "/roles",
+    request_body = CreateRole,
+    responses(
+        (status = 201, description = "Role Created", body = roles::Model),
+    ),
+    tag = "role",
+)]
 async fn create_role(
     State(db): State<Arc<DatabaseConnection>>,
     Json(role): Json<CreateRole>,
@@ -108,6 +129,18 @@ async fn create_role(
     Ok((StatusCode::CREATED, Json(role)))
 }
 
+#[utoipa::path(
+    patch,
+    path = "/users/{id}",
+    request_body = UpdateUser,
+    params(
+        ("id", description = "User id"),
+    ),
+    responses(
+        (status = 200, description = "User Updated", body = UserWithRoles),
+    ),
+    tag = "user",
+)]
 async fn update_user(
     State(db): State<Arc<DatabaseConnection>>,
     Path(id): Path<NonZeroU16>,
@@ -178,6 +211,18 @@ async fn update_user(
     Ok(Json(UserWithRoles { user, roles }))
 }
 
+#[utoipa::path(
+    patch,
+    path = "/roles/{slug}",
+    request_body = UpdateRole,
+    params(
+        ("slug", description = "Role slug"),
+    ),
+    responses(
+        (status = 200, description = "Role Updated", body = roles::Model),
+    ),
+    tag = "role",
+)]
 async fn update_role(
     State(db): State<Arc<DatabaseConnection>>,
     Path(slug): Path<String>,
@@ -204,6 +249,14 @@ async fn update_role(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/users",
+    responses(
+        (status = 200, description = "Users", body = Vec<UserWithRoles>),
+    ),
+    tag = "user",
+)]
 async fn list_users(
     State(db): State<Arc<DatabaseConnection>>,
 ) -> Result<Json<Vec<UserWithRoles>>, Error> {
@@ -218,12 +271,31 @@ async fn list_users(
     ))
 }
 
+#[utoipa::path(
+    get,
+    path = "/roles",
+    responses(
+        (status = 200, description = "Roles", body = Vec<roles::Model>),
+    ),
+    tag = "role",
+)]
 async fn list_roles(
     State(db): State<Arc<DatabaseConnection>>,
 ) -> Result<Json<Vec<roles::Model>>, Error> {
     Ok(Json(Roles::find().all(db.as_ref()).await?))
 }
 
+#[utoipa::path(
+    get,
+    path = "/users/{id}",
+    params(
+        ("id", description = "User id"),
+    ),
+    responses(
+        (status = 200, description = "User Updated", body = Vec<UserWithRoles>),
+    ),
+    tag = "user",
+)]
 async fn get_user(
     State(db): State<Arc<DatabaseConnection>>,
     Path(id): Path<NonZeroU16>,
@@ -240,6 +312,17 @@ async fn get_user(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/roles/{slug}",
+    params(
+        ("slug", description = "Role slug"),
+    ),
+    responses(
+        (status = 200, description = "Role", body = roles::Model),
+    ),
+    tag = "role",
+)]
 async fn get_role(
     State(db): State<Arc<DatabaseConnection>>,
     Path(slug): Path<String>,
@@ -253,6 +336,17 @@ async fn get_role(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/users/{id}",
+    params(
+        ("id", description = "User id"),
+    ),
+    responses(
+        (status = 200, description = "User deleted"),
+    ),
+    tag = "user",
+)]
 async fn delete_user(
     State(db): State<Arc<DatabaseConnection>>,
     Path(id): Path<NonZeroU16>,
@@ -264,6 +358,17 @@ async fn delete_user(
     Ok(StatusCode::OK)
 }
 
+#[utoipa::path(
+    delete,
+    path = "/roles/{slug}",
+    params(
+        ("slug", description = "Role slug"),
+    ),
+    responses(
+        (status = 200, description = "Role deleted"),
+    ),
+    tag = "role",
+)]
 async fn delete_role(
     State(db): State<Arc<DatabaseConnection>>,
     Path(slug): Path<String>,
@@ -329,37 +434,70 @@ impl<T: Into<Error> + std::error::Error> From<TransactionError<T>> for Error {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 struct CreateUser {
     name: String,
     role_slug: String,
+    #[schema(format = "email")]
     email: Option<EmailAddress>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 struct CreateRole {
     slug: String,
     name: String,
     permissions: Permissions,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 struct UpdateUser {
     name: Option<String>,
+    #[schema(format = "email")]
     email: Option<EmailAddress>,
     add_roles: Option<Vec<String>>,
     remove_roles: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 struct UpdateRole {
     name: Option<String>,
     permissions: Option<Permissions>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 struct UserWithRoles {
     #[serde(flatten)]
     user: users::Model,
     roles: Vec<roles::Model>,
 }
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        create_user,
+        create_role,
+        update_user,
+        update_role,
+        list_users,
+        list_roles,
+        get_user,
+        get_role,
+        delete_user,
+        delete_role,
+    ),
+    components(schemas(
+        UserWithRoles,
+        CreateUser,
+        CreateRole,
+        UpdateUser,
+        UpdateRole,
+        roles::Model,
+        Permissions,
+        users::Model,
+    )),
+    tags(
+        (name = "user", description = "User"),
+        (name = "role", description = "Role"),
+    ),
+)]
+struct ApiDoc;

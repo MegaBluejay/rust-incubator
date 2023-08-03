@@ -2,13 +2,16 @@
 
 use sea_orm::entity::prelude::*;
 use serde::Serialize;
+use utoipa::ToSchema;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, ToSchema)]
+#[schema(as = users::Model, title = "User")]
 #[sea_orm(table_name = "users")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub name: String,
+    #[schema(format = "email")]
     pub email: Option<String>,
 }
 

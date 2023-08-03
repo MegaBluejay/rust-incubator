@@ -2,8 +2,11 @@
 
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Deserialize, Serialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Deserialize, Serialize, ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 #[sea_orm(rs_type = "String", db_type = "String(Some(256))")]
 pub enum Permissions {
@@ -15,7 +18,8 @@ pub enum Permissions {
     Admin,
 }
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, ToSchema)]
+#[schema(as = roles::Model, title = "Role")]
 #[sea_orm(table_name = "roles")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
