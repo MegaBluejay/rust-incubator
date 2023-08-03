@@ -2105,6 +2105,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "migration_4_3"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "sea-orm-migration",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4213,6 +4221,23 @@ dependencies = [
 [[package]]
 name = "step_4_3"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "clap",
+ "email_address",
+ "sea-orm",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "step_4_3_client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "reqwest",
+]
 
 [[package]]
 name = "stringprep"
