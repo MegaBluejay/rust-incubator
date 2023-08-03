@@ -11,6 +11,7 @@ use openapi::{
     },
     models::{CreateRole, RolesPeriodModel, UserWithRoles},
 };
+use thiserror::Error;
 
 #[derive(Debug, ValueEnum, Clone)]
 #[value(rename_all = "snake_case")]
@@ -101,7 +102,7 @@ enum Delete {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> Result<(), Error> {
     let Cli { command } = Cli::try_parse()?;
 
     let conf = Configuration {
@@ -243,6 +244,37 @@ impl From<Permissions> for openapi::models::Permissions {
             Permissions::Admin => openapi::models::Permissions::Admin,
             Permissions::Editor => openapi::models::Permissions::Editor,
             Permissions::Reader => openapi::models::Permissions::Reader,
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+enum Error {
+    #[error(transparent)]
+    Clap(#[from] clap::Error),
+    #[error(transparent)]
+    Reqwest(#[from] reqwest::Error),
+    #[error(transparent)]
+    Serde(#[from] serde_json::Error),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("api error. status: {status}, content: {content}")]
+    Api {
+        status: reqwest::StatusCode,
+        content: String,
+    },
+}
+
+impl<T> From<openapi::apis::Error<T>> for Error {
+    fn from(value: openapi::apis::Error<T>) -> Self {
+        match value {
+            openapi::apis::Error::Io(err) => Self::Io(err),
+            openapi::apis::Error::Reqwest(err) => Self::Reqwest(err),
+            openapi::apis::Error::Serde(err) => Self::Serde(err),
+            openapi::apis::Error::ResponseError(err) => Self::Api {
+                status: err.status,
+                content: err.content,
+            },
         }
     }
 }

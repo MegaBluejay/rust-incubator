@@ -19,6 +19,7 @@ use super::{Error, configuration};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum CreateRoleError {
+    Status400(),
     UnknownValue(serde_json::Value),
 }
 
@@ -26,6 +27,7 @@ pub enum CreateRoleError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum DeleteRoleError {
+    Status400(),
     UnknownValue(serde_json::Value),
 }
 
@@ -33,6 +35,7 @@ pub enum DeleteRoleError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum GetRoleError {
+    Status400(),
     UnknownValue(serde_json::Value),
 }
 
@@ -40,6 +43,7 @@ pub enum GetRoleError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ListRolesError {
+    Status400(),
     UnknownValue(serde_json::Value),
 }
 
@@ -47,6 +51,7 @@ pub enum ListRolesError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum UpdateRoleError {
+    Status400(),
     UnknownValue(serde_json::Value),
 }
 

@@ -19,6 +19,7 @@ use super::{Error, configuration};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum CreateUserError {
+    Status400(),
     UnknownValue(serde_json::Value),
 }
 
@@ -26,6 +27,7 @@ pub enum CreateUserError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum DeleteUserError {
+    Status400(),
     UnknownValue(serde_json::Value),
 }
 
@@ -33,6 +35,7 @@ pub enum DeleteUserError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum GetUserError {
+    Status400(),
     UnknownValue(serde_json::Value),
 }
 
@@ -40,6 +43,7 @@ pub enum GetUserError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ListUsersError {
+    Status400(),
     UnknownValue(serde_json::Value),
 }
 
@@ -47,6 +51,7 @@ pub enum ListUsersError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum UpdateUserError {
+    Status400(),
     UnknownValue(serde_json::Value),
 }
 

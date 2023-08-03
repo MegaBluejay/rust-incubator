@@ -15,7 +15,8 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use utoipa::{OpenApi, ToSchema};
+use utoipa::openapi::{self, RefOr, ResponseBuilder};
+use utoipa::{OpenApi, ToResponse, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
 
 mod entities;
@@ -54,6 +55,7 @@ async fn main() -> Result<()> {
     request_body = CreateUser,
     responses(
         (status = 201, description = "User Created", body = UserWithRoles),
+        (status = 400, response = Error),
     ),
     tag = "user",
 )]
@@ -105,6 +107,7 @@ async fn create_user(
     request_body = CreateRole,
     responses(
         (status = 201, description = "Role Created", body = roles::Model),
+        (status = 400, response = Error),
     ),
     tag = "role",
 )]
@@ -138,6 +141,7 @@ async fn create_role(
     ),
     responses(
         (status = 200, description = "User Updated", body = UserWithRoles),
+        (status = 400, response = Error),
     ),
     tag = "user",
 )]
@@ -220,6 +224,7 @@ async fn update_user(
     ),
     responses(
         (status = 200, description = "Role Updated", body = roles::Model),
+        (status = 400, response = Error),
     ),
     tag = "role",
 )]
@@ -254,6 +259,7 @@ async fn update_role(
     path = "/users",
     responses(
         (status = 200, description = "Users", body = Vec<UserWithRoles>),
+        (status = 400, response = Error),
     ),
     tag = "user",
 )]
@@ -276,6 +282,7 @@ async fn list_users(
     path = "/roles",
     responses(
         (status = 200, description = "Roles", body = Vec<roles::Model>),
+        (status = 400, response = Error),
     ),
     tag = "role",
 )]
@@ -293,6 +300,7 @@ async fn list_roles(
     ),
     responses(
         (status = 200, description = "User Updated", body = UserWithRoles),
+        (status = 400, response = Error),
     ),
     tag = "user",
 )]
@@ -320,6 +328,7 @@ async fn get_user(
     ),
     responses(
         (status = 200, description = "Role", body = roles::Model),
+        (status = 400, response = Error),
     ),
     tag = "role",
 )]
@@ -344,6 +353,7 @@ async fn get_role(
     ),
     responses(
         (status = 200, description = "User deleted"),
+        (status = 400, response = Error),
     ),
     tag = "user",
 )]
@@ -366,6 +376,7 @@ async fn delete_user(
     ),
     responses(
         (status = 200, description = "Role deleted"),
+        (status = 400, response = Error),
     ),
     tag = "role",
 )]
@@ -413,6 +424,15 @@ enum Error {
     NotFound(Entity),
     #[error("user can't have no roles")]
     NoRole,
+}
+
+impl<'a> ToResponse<'a> for Error {
+    fn response() -> (&'a str, RefOr<openapi::response::Response>) {
+        (
+            "Error",
+            ResponseBuilder::new().description("Error").build().into(),
+        )
+    }
 }
 
 impl IntoResponse for Error {
@@ -485,16 +505,19 @@ struct UserWithRoles {
         delete_user,
         delete_role,
     ),
-    components(schemas(
-        UserWithRoles,
-        CreateUser,
-        CreateRole,
-        UpdateUser,
-        UpdateRole,
-        roles::Model,
-        Permissions,
-        users::Model,
-    )),
+    components(
+        schemas(
+            UserWithRoles,
+            CreateUser,
+            CreateRole,
+            UpdateUser,
+            UpdateRole,
+            roles::Model,
+            Permissions,
+            users::Model,
+        ),
+        responses(Error),
+    ),
     tags(
         (name = "user", description = "User"),
         (name = "role", description = "Role"),

@@ -4369,6 +4369,9 @@ dependencies = [
  "clap",
  "email_address",
  "openapi",
+ "reqwest",
+ "serde_json",
+ "thiserror",
  "tokio",
 ]
 
