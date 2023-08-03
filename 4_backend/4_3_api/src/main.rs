@@ -134,7 +134,7 @@ async fn create_role(
     path = "/users/{id}",
     request_body = UpdateUser,
     params(
-        ("id", description = "User id"),
+        ("id" = u16, description = "User id"),
     ),
     responses(
         (status = 200, description = "User Updated", body = UserWithRoles),
@@ -216,7 +216,7 @@ async fn update_user(
     path = "/roles/{slug}",
     request_body = UpdateRole,
     params(
-        ("slug", description = "Role slug"),
+        ("slug" = String, description = "Role slug"),
     ),
     responses(
         (status = 200, description = "Role Updated", body = roles::Model),
@@ -289,10 +289,10 @@ async fn list_roles(
     get,
     path = "/users/{id}",
     params(
-        ("id", description = "User id"),
+        ("id" = u16, description = "User id"),
     ),
     responses(
-        (status = 200, description = "User Updated", body = Vec<UserWithRoles>),
+        (status = 200, description = "User Updated", body = UserWithRoles),
     ),
     tag = "user",
 )]
@@ -316,7 +316,7 @@ async fn get_user(
     get,
     path = "/roles/{slug}",
     params(
-        ("slug", description = "Role slug"),
+        ("slug" = String, description = "Role slug"),
     ),
     responses(
         (status = 200, description = "Role", body = roles::Model),
@@ -340,7 +340,7 @@ async fn get_role(
     delete,
     path = "/users/{id}",
     params(
-        ("id", description = "User id"),
+        ("id" = u16, description = "User id"),
     ),
     responses(
         (status = 200, description = "User deleted"),
@@ -362,7 +362,7 @@ async fn delete_user(
     delete,
     path = "/roles/{slug}",
     params(
-        ("slug", description = "Role slug"),
+        ("slug" = String, description = "Role slug"),
     ),
     responses(
         (status = 200, description = "Role deleted"),
@@ -438,7 +438,7 @@ impl<T: Into<Error> + std::error::Error> From<TransactionError<T>> for Error {
 struct CreateUser {
     name: String,
     role_slug: String,
-    #[schema(format = "email")]
+    #[schema(value_type = Option<String>, format = "email")]
     email: Option<EmailAddress>,
 }
 
@@ -452,7 +452,7 @@ struct CreateRole {
 #[derive(Debug, Deserialize, ToSchema)]
 struct UpdateUser {
     name: Option<String>,
-    #[schema(format = "email")]
+    #[schema(value_type = Option<String>, format = "email")]
     email: Option<EmailAddress>,
     add_roles: Option<Vec<String>>,
     remove_roles: Option<Vec<String>>,

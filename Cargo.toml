@@ -13,5 +13,6 @@ members = [
     "4_backend/4_2_http/migration",
     "4_backend/4_2_http/client",
     "4_backend/4_3_api/migration",
-    "4_backend/4_3_api/client"
+    "4_backend/4_3_api/client",
+    "4_backend/4_3_api/api_client"
 ]

@@ -6,4 +6,7 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.72"
-reqwest = { version = "0.11.18", default-features = false, features = ["blocking", "json"] }
+clap = { version = "4.3.19", features = ["derive"] }
+email_address = "0.2.4"
+openapi = { path = "../api_client" }
+tokio = { version = "1.29.1", features = ["full"] }
