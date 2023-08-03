@@ -20,6 +20,7 @@ pub enum Permissions {
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, ToSchema)]
 #[schema(as = roles::Model, title = "Role")]
+#[serde(rename_all = "camelCase")]
 #[sea_orm(table_name = "roles")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]

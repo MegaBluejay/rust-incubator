@@ -13,13 +13,13 @@
 
 #[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
 pub struct UpdateUser {
-    #[serde(rename = "add_roles", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "addRoles", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
     pub add_roles: Option<Option<Vec<String>>>,
     #[serde(rename = "email", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
     pub email: Option<Option<String>>,
     #[serde(rename = "name", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
     pub name: Option<Option<String>>,
-    #[serde(rename = "remove_roles", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "removeRoles", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
     pub remove_roles: Option<Option<Vec<String>>>,
 }
 

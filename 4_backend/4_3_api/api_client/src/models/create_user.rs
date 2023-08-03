@@ -17,7 +17,7 @@ pub struct CreateUser {
     pub email: Option<Option<String>>,
     #[serde(rename = "name")]
     pub name: String,
-    #[serde(rename = "role_slug")]
+    #[serde(rename = "roleSlug")]
     pub role_slug: String,
 }
 

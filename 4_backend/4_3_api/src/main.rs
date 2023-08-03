@@ -455,6 +455,7 @@ impl<T: Into<Error> + std::error::Error> From<TransactionError<T>> for Error {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 struct CreateUser {
     name: String,
     role_slug: String,
@@ -463,6 +464,7 @@ struct CreateUser {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 struct CreateRole {
     slug: String,
     name: String,
@@ -470,6 +472,7 @@ struct CreateRole {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 struct UpdateUser {
     name: Option<String>,
     #[schema(value_type = Option<String>, format = "email")]
@@ -479,12 +482,14 @@ struct UpdateUser {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 struct UpdateRole {
     name: Option<String>,
     permissions: Option<Permissions>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 struct UserWithRoles {
     #[serde(flatten)]
     user: users::Model,
