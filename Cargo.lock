@@ -4224,9 +4224,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
- "clap",
  "email_address",
  "sea-orm",
+ "serde",
  "thiserror",
  "tokio",
 ]
