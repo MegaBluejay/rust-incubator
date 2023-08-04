@@ -4,12 +4,13 @@ use argon2::{
 };
 use async_trait::async_trait;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait,
+    QueryFilter, TransactionError, TransactionTrait,
 };
 use thiserror::Error;
 
 use crate::{
-    api::{Database, InUser, User},
+    api::{Database, EditUser, InUser, User},
     entities::{friends, prelude::*, users},
 };
 
@@ -28,6 +29,15 @@ pub enum Error {
 impl From<argon2::password_hash::Error> for Error {
     fn from(value: argon2::password_hash::Error) -> Self {
         Self::PasswordHash(value)
+    }
+}
+
+impl<T: Into<Error> + std::error::Error> From<TransactionError<T>> for Error {
+    fn from(value: TransactionError<T>) -> Self {
+        match value {
+            TransactionError::Connection(db) => Self::Db(db),
+            TransactionError::Transaction(other) => other.into(),
+        }
     }
 }
 
@@ -109,6 +119,55 @@ impl Database for DatabaseConnection {
         Argon2::default().verify_password(password.as_bytes(), &parsed)?;
 
         Ok(user.id.to_string())
+    }
+
+    async fn edit(&self, current_user: Option<&User>, edit: EditUser) -> Result<User, Self::Error> {
+        let current_user = current_user.ok_or(Error::NotAuthorized)?;
+
+        let id = current_user.id;
+
+        self.transaction::<_, User, Error>(|txn| {
+            Box::pin(async move {
+                let user = Users::find_by_id(id)
+                    .one(txn)
+                    .await?
+                    .ok_or(Error::NotFound)?;
+
+                if let Some(add_friends) = edit.add_friends {
+                    let new_friends = Users::find()
+                        .filter(users::Column::Name.is_in(add_friends))
+                        .all(txn)
+                        .await?;
+
+                    let adds = new_friends.into_iter().map(|friend| friends::ActiveModel {
+                        user_id: ActiveValue::Set(id),
+                        friend_id: ActiveValue::Set(friend.id),
+                    });
+
+                    Friends::insert_many(adds).exec(txn).await?;
+                }
+
+                if let Some(remove_friends) = edit.remove_friends {
+                    let removes = Users::find()
+                        .filter(users::Column::Name.is_in(remove_friends))
+                        .all(txn)
+                        .await?
+                        .into_iter()
+                        .map(|user| user.id);
+
+                    Friends::delete_many().filter(
+                        friends::Column::UserId
+                            .eq(id)
+                            .and(friends::Column::FriendId.is_in(removes)),
+                    );
+                }
+
+                let friends = user.find_linked(users::FriendsLink).all(txn).await?;
+                Ok((user, friends).into())
+            })
+        })
+        .await
+        .map_err(Into::into)
     }
 }
 
