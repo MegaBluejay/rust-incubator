@@ -1,3 +1,2 @@
-fn main() {
-    println!("Implement me!");
-}
+#[tokio::main]
+async fn main() {}
