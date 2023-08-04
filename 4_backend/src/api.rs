@@ -22,6 +22,8 @@ pub trait Database {
     async fn register(&self, user: InUser) -> Result<User, Self::Error>;
 
     async fn login(&self, user: InUser) -> Result<String, Self::Error>;
+
+    async fn edit(&self, current_user: Option<&User>, edit: EditUser) -> Result<User, Self::Error>;
 }
 
 #[derive(Clone)]
@@ -76,6 +78,13 @@ where
     async fn login(&self, user: InUser) -> Result<String, Self::Error> {
         self.inner.login(user).await.map_err(Into::into)
     }
+
+    async fn edit(&self, current_user: Option<&User>, edit: EditUser) -> Result<User, Self::Error> {
+        self.inner
+            .edit(current_user, edit)
+            .await
+            .map_err(Into::into)
+    }
 }
 
 pub struct Context {
@@ -115,6 +124,12 @@ pub struct InUser {
     pub password: String,
 }
 
+#[derive(GraphQLInputObject)]
+pub struct EditUser {
+    pub add_friends: Option<Vec<String>>,
+    pub remove_friends: Option<Vec<String>>,
+}
+
 pub struct Query;
 
 #[graphql_object(context = Context)]
@@ -136,6 +151,10 @@ impl Mutation {
 
     async fn login(user: InUser, ctx: &Context) -> Result<String, FieldError> {
         ctx.db.login(user).await
+    }
+
+    async fn edit(edit: EditUser, ctx: &Context) -> Result<User, FieldError> {
+        ctx.db.edit(ctx.current_user.as_ref(), edit).await
     }
 }
 
