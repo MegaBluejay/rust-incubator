@@ -3,3 +3,12 @@ name = "step_4_2"
 version = "0.1.0"
 edition = "2021"
 publish = false
+
+[dependencies]
+anyhow = "1.0.72"
+axum = "0.6.19"
+clap = { version = "4.3.19", features = ["derive"] }
+email_address = "0.2.4"
+sea-orm = { version = "0.12.1", features = ["sqlx-sqlite", "runtime-tokio-native-tls"] }
+thiserror = "1.0.44"
+tokio = { version = "1.29.1", features = ["full"] }
