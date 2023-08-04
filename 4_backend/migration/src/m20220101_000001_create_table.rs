@@ -23,6 +23,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .unique_key(),
                     )
+                    .col(ColumnDef::new(Users::Password).string().not_null())
                     .to_owned(),
             )
             .await?;
@@ -37,12 +38,14 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .from(Friends::Table, Friends::UserId)
-                            .to(Users::Table, Users::Id),
+                            .to(Users::Table, Users::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .from(Friends::Table, Friends::FriendId)
-                            .to(Users::Table, Users::Id),
+                            .to(Users::Table, Users::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )
@@ -64,6 +67,7 @@ enum Users {
     Table,
     Id,
     Name,
+    Password,
 }
 
 #[derive(DeriveIden)]
