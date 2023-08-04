@@ -106,7 +106,7 @@ Do not hesitate to ask your mentor/lead with questions, however you won't receiv
 - [ ] [4. Backend ecosystem][Step 4] (3 days, after all sub-steps)
     - [x] [4.1. Databases, connection pools and ORMs][Step 4.1] (1 day)
     - [x] [4.2. HTTP servers and clients][Step 4.2] (1 day)
-    - [ ] [4.3. API servers, clients and tools][Step 4.3] (1 day)
+    - [x] [4.3. API servers, clients and tools][Step 4.3] (1 day)
 
 
 
