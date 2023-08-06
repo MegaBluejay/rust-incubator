@@ -5,8 +5,8 @@ use argon2::{
 use async_trait::async_trait;
 use jsonwebtoken::{Algorithm, EncodingKey};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, JoinType,
-    ModelTrait, QueryFilter, QuerySelect, RelationTrait, TransactionError, TransactionTrait,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait,
+    QueryFilter, TransactionError, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
