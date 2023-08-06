@@ -1,7 +1,10 @@
 use std::fmt::Display;
 
 use async_trait::async_trait;
-use juniper::{graphql_object, EmptySubscription, FieldError, GraphQLInputObject, RootNode};
+use juniper::{
+    graphql_object, EmptySubscription, FieldError, GraphQLInputObject, LookAheadMethods,
+    LookAheadSelection, RootNode,
+};
 
 #[async_trait]
 pub trait Database {
@@ -90,6 +93,7 @@ where
 pub struct Context {
     pub db: Box<dyn Database<Error = FieldError> + Send + Sync>,
     pub current_user: Option<User>,
+    pub max_depth: i32,
 }
 
 impl juniper::Context for Context {}
@@ -130,12 +134,31 @@ pub struct EditUser {
     pub remove_friends: Option<Vec<String>>,
 }
 
+fn depth<S>(start: &LookAheadSelection<'_, S>) -> i32 {
+    let mut layer = vec![start];
+    for i in 1.. {
+        layer = layer.into_iter().flat_map(|x| x.children()).collect();
+        if layer.is_empty() {
+            return i;
+        }
+    }
+    unreachable!()
+}
+
 #[derive(Clone)]
 pub struct Query;
 
 #[graphql_object(context = Context)]
 impl Query {
-    async fn user(name: Option<String>, ctx: &Context) -> Result<User, FieldError> {
+    async fn user(
+        name: Option<String>,
+        ctx: &Context,
+        executor: &Executor,
+    ) -> Result<User, FieldError> {
+        if depth(&executor.look_ahead()) > ctx.max_depth {
+            return Err(FieldError::from("depth limit exceeded"));
+        }
+
         ctx.db
             .find_user(ctx.current_user.as_ref(), name.as_deref())
             .await
@@ -147,7 +170,14 @@ pub struct Mutation;
 
 #[graphql_object(context = Context)]
 impl Mutation {
-    async fn register(user: InUser, ctx: &Context) -> Result<User, FieldError> {
+    async fn register(
+        user: InUser,
+        ctx: &Context,
+        executor: &Executor,
+    ) -> Result<User, FieldError> {
+        if depth(&executor.look_ahead()) > ctx.max_depth {
+            return Err(FieldError::from("depth limit exceeded"));
+        }
         ctx.db.register(user).await
     }
 
@@ -155,7 +185,10 @@ impl Mutation {
         ctx.db.login(user).await
     }
 
-    async fn edit(edit: EditUser, ctx: &Context) -> Result<User, FieldError> {
+    async fn edit(edit: EditUser, ctx: &Context, executor: &Executor) -> Result<User, FieldError> {
+        if depth(&executor.look_ahead()) > ctx.max_depth {
+            return Err(FieldError::from("depth limit exceeded"));
+        }
         ctx.db.edit(ctx.current_user.as_ref(), edit).await
     }
 }

@@ -95,6 +95,7 @@ async fn graphql_handler(
             db: state.db,
             key: EncodingKey::from_secret(&state.secret),
         })),
+        max_depth: 5,
     };
 
     let response = request.execute(state.schema.as_ref(), &ctx).await;
