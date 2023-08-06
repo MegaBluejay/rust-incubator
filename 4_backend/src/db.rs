@@ -51,8 +51,14 @@ impl<T: Into<Error> + std::error::Error> From<TransactionError<T>> for Error {
 
 #[derive(Clone)]
 pub struct SeaDb {
-    pub db: DatabaseConnection,
-    pub key: EncodingKey,
+    db: DatabaseConnection,
+    key: EncodingKey,
+}
+
+impl SeaDb {
+    pub fn new(db: DatabaseConnection, key: EncodingKey) -> Self {
+        Self { db, key }
+    }
 }
 
 #[async_trait]

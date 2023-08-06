@@ -91,10 +91,10 @@ async fn graphql_handler(
 
     let ctx = Context {
         current_user,
-        db: Box::new(WrappedDatabase::new(SeaDb {
-            db: state.db,
-            key: EncodingKey::from_secret(&state.secret),
-        })),
+        db: Box::new(WrappedDatabase::new(SeaDb::new(
+            state.db,
+            EncodingKey::from_secret(&state.secret),
+        ))),
         max_depth: 5,
     };
 
