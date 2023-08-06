@@ -10,9 +10,11 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt().init();
 
     let db_url = env::var("DATABASE_URL")?;
+    let jwt_secret = env::var("JWT_SECRET")?;
+
     let db = Database::connect(&db_url).await?;
 
-    server(db, &"0.0.0.0:3000".parse()?, "secret".as_bytes()).await?;
+    server(db, &"0.0.0.0:3000".parse()?, jwt_secret.as_bytes()).await?;
 
     Ok(())
 }
