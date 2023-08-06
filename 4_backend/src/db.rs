@@ -10,6 +10,7 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use ultra_batch::{Batcher, Cache, Fetcher, LoadError};
 
 use crate::{
     api::{Database, EditUser, InUser, User},
@@ -26,6 +27,8 @@ pub enum Error {
     NotAuthorized,
     #[error("not found")]
     NotFound,
+    #[error(transparent)]
+    LoadError(#[from] LoadError),
 }
 
 impl From<argon2::password_hash::Error> for Error {
@@ -53,11 +56,38 @@ impl<T: Into<Error> + std::error::Error> From<TransactionError<T>> for Error {
 pub struct SeaDb {
     db: DatabaseConnection,
     key: EncodingKey,
+    batcher: Batcher<UserIdFetcher>,
 }
+
+struct UserIdFetcher(DatabaseConnection);
 
 impl SeaDb {
     pub fn new(db: DatabaseConnection, key: EncodingKey) -> Self {
-        Self { db, key }
+        let batcher = Batcher::build(UserIdFetcher(db.clone())).finish();
+        Self { db, key, batcher }
+    }
+}
+
+#[async_trait]
+impl Fetcher for UserIdFetcher {
+    type Key = i32;
+    type Value = User;
+    type Error = Error;
+
+    async fn fetch(
+        &self,
+        keys: &[Self::Key],
+        values: &mut Cache<'_, Self::Key, Self::Value>,
+    ) -> Result<(), Error> {
+        for (user, friends) in Users::find()
+            .filter(users::Column::Id.is_in(keys.iter().map(Clone::clone)))
+            .find_with_related(Friends)
+            .all(&self.0)
+            .await?
+        {
+            values.insert(user.id, (user, friends).into());
+        }
+        Ok(())
     }
 }
 
@@ -72,13 +102,7 @@ impl Database for SeaDb {
     ) -> Result<Vec<User>, Self::Error> {
         current_user.ok_or(Error::NotAuthorized)?;
 
-        let db_users = Users::find()
-            .filter(users::Column::Id.is_in(user_ids.iter().map(Clone::clone)))
-            .find_with_related(Friends)
-            .all(&self.db)
-            .await?;
-
-        Ok(db_users.into_iter().map(Into::into).collect())
+        self.batcher.load_many(user_ids).await.map_err(Into::into)
     }
 
     async fn find_user(
