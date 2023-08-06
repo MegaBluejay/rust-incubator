@@ -94,7 +94,7 @@ pub struct Context {
 
 impl juniper::Context for Context {}
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct User {
     pub id: i32,
     pub name: String,
@@ -118,18 +118,19 @@ impl User {
     }
 }
 
-#[derive(GraphQLInputObject)]
+#[derive(Debug, GraphQLInputObject)]
 pub struct InUser {
     pub name: String,
     pub password: String,
 }
 
-#[derive(GraphQLInputObject)]
+#[derive(Debug, GraphQLInputObject)]
 pub struct EditUser {
     pub add_friends: Option<Vec<String>>,
     pub remove_friends: Option<Vec<String>>,
 }
 
+#[derive(Clone)]
 pub struct Query;
 
 #[graphql_object(context = Context)]
@@ -141,6 +142,7 @@ impl Query {
     }
 }
 
+#[derive(Clone)]
 pub struct Mutation;
 
 #[graphql_object(context = Context)]

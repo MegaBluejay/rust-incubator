@@ -12,30 +12,47 @@ pub struct Model {
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(has_many = "super::friends::Entity")]
+    Friends,
+}
 
-pub struct FriendsLink;
-
-impl Linked for FriendsLink {
-    type FromEntity = Entity;
-
-    type ToEntity = super::friends::Entity;
-
-    fn link(&self) -> Vec<sea_orm::LinkDef> {
-        vec![super::friends::Relation::Users1.def()]
+impl Related<super::friends::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Friends.def()
     }
 }
 
-pub struct FriendOfLink;
+// impl RelationTrait for Relation {
+//     fn def(&self) -> RelationDef {
+//         match self {
+//             Self::Friends => Entity::has_many(super::friends::Entity).into(),
+//         }
+//     }
+// }
 
-impl Linked for FriendOfLink {
-    type FromEntity = Entity;
+// pub struct FriendsLink;
 
-    type ToEntity = super::friends::Entity;
+// impl Linked for FriendsLink {
+//     type FromEntity = Entity;
 
-    fn link(&self) -> Vec<sea_orm::LinkDef> {
-        vec![super::friends::Relation::Users2.def()]
-    }
-}
+//     type ToEntity = super::friends::Entity;
+
+//     fn link(&self) -> Vec<sea_orm::LinkDef> {
+//         vec![super::friends::Relation::Users1.def().rev()]
+//     }
+// }
+
+// pub struct FriendOfLink;
+
+// impl Linked for FriendOfLink {
+//     type FromEntity = Entity;
+
+//     type ToEntity = super::friends::Entity;
+
+//     fn link(&self) -> Vec<sea_orm::LinkDef> {
+//         vec![super::friends::Relation::Users2.def().rev()]
+//     }
+// }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -3,10 +3,12 @@ use argon2::{
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
 };
 use async_trait::async_trait;
+use jsonwebtoken::{Algorithm, EncodingKey};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait,
-    QueryFilter, TransactionError, TransactionTrait,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, JoinType,
+    ModelTrait, QueryFilter, QuerySelect, RelationTrait, TransactionError, TransactionTrait,
 };
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
@@ -32,6 +34,12 @@ impl From<argon2::password_hash::Error> for Error {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Claims {
+    pub id: i32,
+    pub exp: usize,
+}
+
 impl<T: Into<Error> + std::error::Error> From<TransactionError<T>> for Error {
     fn from(value: TransactionError<T>) -> Self {
         match value {
@@ -41,8 +49,14 @@ impl<T: Into<Error> + std::error::Error> From<TransactionError<T>> for Error {
     }
 }
 
+#[derive(Clone)]
+pub struct SeaDb {
+    pub db: DatabaseConnection,
+    pub key: EncodingKey,
+}
+
 #[async_trait]
-impl Database for DatabaseConnection {
+impl Database for SeaDb {
     type Error = Error;
 
     async fn get_users(
@@ -54,8 +68,8 @@ impl Database for DatabaseConnection {
 
         let db_users = Users::find()
             .filter(users::Column::Id.is_in(user_ids.iter().map(Clone::clone)))
-            .find_with_linked(users::FriendsLink)
-            .all(self)
+            .find_with_related(Friends)
+            .all(&self.db)
             .await?;
 
         Ok(db_users.into_iter().map(Into::into).collect())
@@ -71,8 +85,8 @@ impl Database for DatabaseConnection {
         if let Some(name) = name {
             let db_user = Users::find()
                 .filter(users::Column::Name.eq(name))
-                .find_with_linked(users::FriendsLink)
-                .all(self)
+                .find_with_related(Friends)
+                .all(&self.db)
                 .await?
                 .into_iter()
                 .next()
@@ -99,76 +113,95 @@ impl Database for DatabaseConnection {
             password: ActiveValue::Set(password_hash),
             ..Default::default()
         }
-        .insert(self)
+        .insert(&self.db)
         .await?;
 
         Ok((user, vec![]).into())
     }
 
     async fn login(&self, user: InUser) -> Result<String, Self::Error> {
-        // TODO actual tokens
         let InUser { name, password } = user;
 
         let user = Users::find()
             .filter(users::Column::Name.eq(name))
-            .one(self)
+            .one(&self.db)
             .await?
             .ok_or(Error::NotFound)?;
 
         let parsed = PasswordHash::new(&user.password)?;
         Argon2::default().verify_password(password.as_bytes(), &parsed)?;
 
-        Ok(user.id.to_string())
+        let header = jsonwebtoken::Header::new(Algorithm::HS512);
+        Ok(jsonwebtoken::encode(
+            &header,
+            &Claims {
+                id: user.id,
+                exp: usize::MAX,
+            },
+            &self.key,
+        )
+        .unwrap())
     }
 
     async fn edit(&self, current_user: Option<&User>, edit: EditUser) -> Result<User, Self::Error> {
         let current_user = current_user.ok_or(Error::NotAuthorized)?;
 
-        let id = current_user.id;
+        let id = dbg!(current_user.id);
 
-        self.transaction::<_, User, Error>(|txn| {
-            Box::pin(async move {
-                let user = Users::find_by_id(id)
-                    .one(txn)
-                    .await?
-                    .ok_or(Error::NotFound)?;
-
-                if let Some(add_friends) = edit.add_friends {
-                    let new_friends = Users::find()
-                        .filter(users::Column::Name.is_in(add_friends))
-                        .all(txn)
-                        .await?;
-
-                    let adds = new_friends.into_iter().map(|friend| friends::ActiveModel {
-                        user_id: ActiveValue::Set(id),
-                        friend_id: ActiveValue::Set(friend.id),
-                    });
-
-                    Friends::insert_many(adds).exec(txn).await?;
-                }
-
-                if let Some(remove_friends) = edit.remove_friends {
-                    let removes = Users::find()
-                        .filter(users::Column::Name.is_in(remove_friends))
-                        .all(txn)
+        self.db
+            .transaction::<_, User, Error>(|txn| {
+                Box::pin(async move {
+                    let user = Users::find_by_id(id)
+                        .one(txn)
                         .await?
-                        .into_iter()
-                        .map(|user| user.id);
+                        .ok_or(Error::NotFound)?;
 
-                    Friends::delete_many().filter(
-                        friends::Column::UserId
-                            .eq(id)
-                            .and(friends::Column::FriendId.is_in(removes)),
-                    );
-                }
+                    if let Some(add_friends) = edit.add_friends {
+                        let new_friends = Users::find()
+                            .filter(users::Column::Name.is_in(add_friends))
+                            .all(txn)
+                            .await?;
 
-                let friends = user.find_linked(users::FriendsLink).all(txn).await?;
-                Ok((user, friends).into())
+                        let adds = new_friends.into_iter().map(|friend| friends::ActiveModel {
+                            user_id: ActiveValue::Set(id),
+                            friend_id: ActiveValue::Set(friend.id),
+                        });
+
+                        Friends::insert_many(adds).exec(txn).await?;
+                    }
+
+                    if let Some(remove_friends) = edit.remove_friends {
+                        let removes = Users::find()
+                            .filter(users::Column::Name.is_in(remove_friends))
+                            .all(txn)
+                            .await?
+                            .into_iter()
+                            .map(|user| user.id);
+
+                        Friends::delete_many().filter(
+                            friends::Column::UserId
+                                .eq(id)
+                                .and(friends::Column::FriendId.is_in(removes)),
+                        );
+                    }
+
+                    let friends = user.find_related(Friends).all(txn).await?;
+                    Ok((user, friends).into())
+                })
             })
-        })
-        .await
-        .map_err(Into::into)
+            .await
+            .map_err(Into::into)
     }
+}
+
+pub async fn get_user(db: &DatabaseConnection, id: i32) -> Result<Option<User>, Error> {
+    Ok(Users::find_by_id(id)
+        .find_with_related(Friends)
+        .all(db)
+        .await?
+        .into_iter()
+        .next()
+        .map(Into::into))
 }
 
 impl From<(users::Model, Vec<friends::Model>)> for User {
