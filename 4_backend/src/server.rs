@@ -9,10 +9,7 @@ use axum::{
 };
 use hyper::StatusCode;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Validation};
-use juniper::{
-    http::{graphiql::graphiql_source, GraphQLBatchRequest},
-    EmptySubscription,
-};
+use juniper::{http::GraphQLBatchRequest, EmptySubscription};
 use sea_orm::DatabaseConnection;
 
 use crate::{
@@ -25,6 +22,7 @@ struct TheState {
     db: DatabaseConnection,
     schema: Arc<Root>,
     secret: Vec<u8>,
+    graphql_url: String,
 }
 
 pub async fn server(
@@ -43,6 +41,7 @@ pub async fn server(
                 EmptySubscription::new(),
             )),
             secret: secret.to_owned(),
+            graphql_url: "/graphql".to_owned(),
         });
 
     axum::Server::bind(addr)
@@ -108,8 +107,9 @@ async fn graphql_handler(
     (status, ser_response)
 }
 
-async fn graphiql_handler() -> Html<String> {
-    Html(graphiql_source("/graphql", None))
+async fn graphiql_handler(State(state): State<TheState>) -> Html<String> {
+    let html = include_str!("../graphiql.html");
+    Html(html.replace("{{GRAPHQL_URL}}", &state.graphql_url))
 }
 
 async fn authenticate(token: &str, key: &DecodingKey, db: &DatabaseConnection) -> Option<User> {
