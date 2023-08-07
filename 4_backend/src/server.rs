@@ -17,10 +17,9 @@ use crate::{
     db::{get_user, Claims, SeaDb},
 };
 
-#[derive(Clone)]
 struct TheState {
     db: DatabaseConnection,
-    schema: Arc<Root>,
+    schema: Root,
     secret: Vec<u8>,
     graphql_url: String,
 }
@@ -33,16 +32,12 @@ pub async fn server(
     let app = Router::new()
         .route("/", get(graphiql_handler))
         .route("/graphql", post(graphql_handler))
-        .with_state(TheState {
+        .with_state(Arc::new(TheState {
             db,
-            schema: Arc::new(Root::new(
-                crate::api::Query,
-                Mutation,
-                EmptySubscription::new(),
-            )),
+            schema: Root::new(crate::api::Query, Mutation, EmptySubscription::new()),
             secret: secret.to_owned(),
             graphql_url: "/graphql".to_owned(),
-        });
+        }));
 
     axum::Server::bind(addr)
         .serve(app.into_make_service())
@@ -72,7 +67,7 @@ impl<T: axum::headers::Header> axum::headers::Header for MaybeHeader<T> {
 }
 
 async fn graphql_handler(
-    State(state): State<TheState>,
+    State(state): State<Arc<TheState>>,
     TypedHeader(MaybeHeader(auth)): TypedHeader<MaybeHeader<Authorization<Bearer>>>,
     request: Json<GraphQLBatchRequest>,
 ) -> (StatusCode, String) {
@@ -91,13 +86,13 @@ async fn graphql_handler(
     let ctx = Context {
         current_user,
         db: Box::new(WrappedDatabase::new(SeaDb::new(
-            state.db,
+            state.db.clone(),
             EncodingKey::from_secret(&state.secret),
         ))),
         max_depth: 5,
     };
 
-    let response = request.execute(state.schema.as_ref(), &ctx).await;
+    let response = request.execute(&state.schema, &ctx).await;
     let status = if response.is_ok() {
         StatusCode::OK
     } else {
@@ -107,7 +102,7 @@ async fn graphql_handler(
     (status, ser_response)
 }
 
-async fn graphiql_handler(State(state): State<TheState>) -> Html<String> {
+async fn graphiql_handler(State(state): State<Arc<TheState>>) -> Html<String> {
     let html = include_str!("../graphiql.html");
     Html(html.replace("{{GRAPHQL_URL}}", &state.graphql_url))
 }
