@@ -10,6 +10,7 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use time::{ext::NumericalDuration, OffsetDateTime};
 use ultra_batch::{Batcher, Cache, Fetcher, LoadError};
 
 use crate::{
@@ -166,7 +167,7 @@ impl Database for SeaDb {
             &header,
             &Claims {
                 id: user.id,
-                exp: usize::MAX,
+                exp: (OffsetDateTime::now_utc() + 1.days()).unix_timestamp() as usize,
             },
             &self.key,
         )
