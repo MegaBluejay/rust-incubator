@@ -1,0 +1,65 @@
+<!doctype html>
+<html class="no-js" lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="x-ua-compatible" content="ie=edge">
+        <title>Step 4</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <style>
+         html, body, #app {
+             height: 100%;
+             margin: 0;
+             overflow: hidden;
+             width: 100%;
+         }
+        </style>
+        <link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/npm/graphiql@0.17.5/graphiql.min.css">
+    </head>
+    <body>
+        <div id="app"></div>
+        <script src="//cdnjs.cloudflare.com/ajax/libs/fetch/2.0.3/fetch.js"></script>
+        <script src="//unpkg.com/subscriptions-transport-ws@0.8.3/browser/client.js"></script>
+        <script src="//unpkg.com/graphiql-subscriptions-fetcher@0.0.2/browser/client.js"></script>
+        <script src="//cdnjs.cloudflare.com/ajax/libs/react/16.10.2/umd/react.production.min.js"></script>
+        <script src="//cdnjs.cloudflare.com/ajax/libs/react-dom/16.10.2/umd/react-dom.production.min.js"></script>
+        <script src="//cdn.jsdelivr.net/npm/graphiql@0.17.5/graphiql.min.js"></script>
+        <script>var GRAPHQL_URL = '{{GRAPHQL_URL}}';</script>
+
+        <script>
+         function graphQLFetcher(params) {
+             var headers = {
+                 'Accept': 'application/json',
+                 'Content-Type': 'application/json',
+             };
+             var token = new URLSearchParams(location.search).get('token');
+             if (token) {
+                 headers['Authorization'] = `Bearer ${decodeURIComponent(token)}`;
+             }
+
+             return fetch(GRAPHQL_URL, {
+                 method: 'post',
+                 headers,
+                 credentials: 'include',
+                 body: JSON.stringify(params)
+             }).then(function (response) {
+                 return response.text();
+             }).then(function (body) {
+                 try {
+                     return JSON.parse(body);
+                 } catch (error) {
+                     return body;
+                 }
+             });
+         }
+
+         ReactDOM.render(
+             React.createElement(GraphiQL, {
+                 fetcher: graphQLFetcher,
+             }),
+             document.querySelector('#app')
+         );
+        </script>
+    </body>
+</html>
