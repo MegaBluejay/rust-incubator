@@ -27,7 +27,7 @@ pub trait Database {
 }
 
 #[derive(Clone)]
-pub struct WrappedDatabase<T> {
+struct WrappedDatabase<T> {
     inner: T,
 }
 
@@ -88,9 +88,23 @@ where
 }
 
 pub struct Context {
-    pub db: Box<dyn Database<Error = FieldError> + Send + Sync>,
-    pub current_user: Result<User, String>,
-    pub max_depth: i32,
+    db: Box<dyn Database<Error = FieldError> + Send + Sync>,
+    current_user: Result<User, String>,
+    max_depth: i32,
+}
+
+impl Context {
+    pub fn new<T>(db: T, current_user: Result<User, String>, max_depth: i32) -> Self
+    where
+        T: Database + Send + Sync + 'static,
+        T::Error: Display,
+    {
+        Self {
+            db: Box::new(WrappedDatabase::new(db)),
+            current_user,
+            max_depth,
+        }
+    }
 }
 
 impl juniper::Context for Context {}

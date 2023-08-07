@@ -14,7 +14,7 @@ use sea_orm::DatabaseConnection;
 use thiserror::Error;
 
 use crate::{
-    api::{Context, Mutation, Root, User, WrappedDatabase},
+    api::{Context, Mutation, Root, User},
     db::{self, get_user, Claims, SeaDb},
 };
 
@@ -85,14 +85,11 @@ async fn graphql_handler(
     }
     .map_err(|err| err.to_string());
 
-    let ctx = Context {
+    let ctx = Context::new(
+        SeaDb::new(state.db.clone(), EncodingKey::from_secret(&state.secret)),
         current_user,
-        db: Box::new(WrappedDatabase::new(SeaDb::new(
-            state.db.clone(),
-            EncodingKey::from_secret(&state.secret),
-        ))),
-        max_depth: 5,
-    };
+        5,
+    );
 
     let response = request.execute(&state.schema, &ctx).await;
     let status = if response.is_ok() {
