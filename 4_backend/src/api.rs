@@ -178,6 +178,7 @@ impl Mutation {
         ctx.db.register(user).await
     }
 
+    /// To use this token in graphiql add `?token=...` to the url
     async fn login(user: InUser, ctx: &Context) -> Result<String, FieldError> {
         ctx.db.login(user).await
     }
