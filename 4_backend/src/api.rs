@@ -12,21 +12,18 @@ pub trait Database {
 
     async fn get_users(
         &self,
-        current_user: Option<&User>,
+        current_user: &User,
         user_ids: &[i32],
     ) -> Result<Vec<User>, Self::Error>;
 
-    async fn find_user(
-        &self,
-        current_user: Option<&User>,
-        name: Option<&str>,
-    ) -> Result<User, Self::Error>;
+    async fn find_user(&self, current_user: &User, name: Option<&str>)
+        -> Result<User, Self::Error>;
 
     async fn register(&self, user: InUser) -> Result<User, Self::Error>;
 
     async fn login(&self, user: InUser) -> Result<String, Self::Error>;
 
-    async fn edit(&self, current_user: Option<&User>, edit: EditUser) -> Result<User, Self::Error>;
+    async fn edit(&self, current_user: &User, edit: EditUser) -> Result<User, Self::Error>;
 }
 
 #[derive(Clone)]
@@ -54,7 +51,7 @@ where
 
     async fn get_users(
         &self,
-        current_user: Option<&User>,
+        current_user: &User,
         user_ids: &[i32],
     ) -> Result<Vec<User>, Self::Error> {
         self.inner
@@ -65,7 +62,7 @@ where
 
     async fn find_user(
         &self,
-        current_user: Option<&User>,
+        current_user: &User,
         name: Option<&str>,
     ) -> Result<User, Self::Error> {
         self.inner
@@ -82,7 +79,7 @@ where
         self.inner.login(user).await.map_err(Into::into)
     }
 
-    async fn edit(&self, current_user: Option<&User>, edit: EditUser) -> Result<User, Self::Error> {
+    async fn edit(&self, current_user: &User, edit: EditUser) -> Result<User, Self::Error> {
         self.inner
             .edit(current_user, edit)
             .await
@@ -92,7 +89,7 @@ where
 
 pub struct Context {
     pub db: Box<dyn Database<Error = FieldError> + Send + Sync>,
-    pub current_user: Option<User>,
+    pub current_user: Result<User, String>,
     pub max_depth: i32,
 }
 
@@ -117,7 +114,7 @@ impl User {
 
     async fn friends(&self, ctx: &Context) -> Result<Vec<User>, FieldError> {
         ctx.db
-            .get_users(ctx.current_user.as_ref(), &self.friend_ids)
+            .get_users(ctx.current_user.as_ref()?, &self.friend_ids)
             .await
     }
 }
@@ -160,7 +157,7 @@ impl Query {
         }
 
         ctx.db
-            .find_user(ctx.current_user.as_ref(), name.as_deref())
+            .find_user(ctx.current_user.as_ref()?, name.as_deref())
             .await
     }
 }
@@ -189,7 +186,7 @@ impl Mutation {
         if depth(&executor.look_ahead()) > ctx.max_depth {
             return Err(FieldError::from("depth limit exceeded"));
         }
-        ctx.db.edit(ctx.current_user.as_ref(), edit).await
+        ctx.db.edit(ctx.current_user.as_ref()?, edit).await
     }
 }
 

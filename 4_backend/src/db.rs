@@ -24,8 +24,6 @@ pub enum Error {
     Db(#[from] DbErr),
     #[error("password hashing error: {0}")]
     PasswordHash(argon2::password_hash::Error),
-    #[error("not authorized")]
-    NotAuthorized,
     #[error("not found")]
     NotFound,
     #[error(transparent)]
@@ -98,21 +96,17 @@ impl Database for SeaDb {
 
     async fn get_users(
         &self,
-        current_user: Option<&User>,
+        _current_user: &User,
         user_ids: &[i32],
     ) -> Result<Vec<User>, Self::Error> {
-        current_user.ok_or(Error::NotAuthorized)?;
-
         self.batcher.load_many(user_ids).await.map_err(Into::into)
     }
 
     async fn find_user(
         &self,
-        current_user: Option<&User>,
+        current_user: &User,
         name: Option<&str>,
     ) -> Result<User, Self::Error> {
-        let current_user = current_user.ok_or(Error::NotAuthorized)?;
-
         if let Some(name) = name {
             let db_user = Users::find()
                 .filter(users::Column::Name.eq(name))
@@ -174,10 +168,8 @@ impl Database for SeaDb {
         .unwrap())
     }
 
-    async fn edit(&self, current_user: Option<&User>, edit: EditUser) -> Result<User, Self::Error> {
-        let current_user = current_user.ok_or(Error::NotAuthorized)?;
-
-        let id = dbg!(current_user.id);
+    async fn edit(&self, current_user: &User, edit: EditUser) -> Result<User, Self::Error> {
+        let id = current_user.id;
 
         self.db
             .transaction::<_, User, Error>(|txn| {
@@ -225,14 +217,15 @@ impl Database for SeaDb {
     }
 }
 
-pub async fn get_user(db: &DatabaseConnection, id: i32) -> Result<Option<User>, Error> {
+pub async fn get_user(db: &DatabaseConnection, id: i32) -> Result<User, Error> {
     Ok(Users::find_by_id(id)
         .find_with_related(Friends)
         .all(db)
         .await?
         .into_iter()
         .next()
-        .map(Into::into))
+        .ok_or(Error::NotFound)?
+        .into())
 }
 
 impl From<(users::Model, Vec<friends::Model>)> for User {

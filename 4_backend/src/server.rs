@@ -11,10 +11,11 @@ use hyper::StatusCode;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Validation};
 use juniper::{http::GraphQLBatchRequest, EmptySubscription};
 use sea_orm::DatabaseConnection;
+use thiserror::Error;
 
 use crate::{
     api::{Context, Mutation, Root, User, WrappedDatabase},
-    db::{get_user, Claims, SeaDb},
+    db::{self, get_user, Claims, SeaDb},
 };
 
 struct TheState {
@@ -80,8 +81,9 @@ async fn graphql_handler(
             )
             .await
         }
-        None => None,
-    };
+        None => Err(AuthError::NoToken),
+    }
+    .map_err(|err| err.to_string());
 
     let ctx = Context {
         current_user,
@@ -107,10 +109,23 @@ async fn graphiql_handler(State(state): State<Arc<TheState>>) -> Html<String> {
     Html(html.replace("{{GRAPHQL_URL}}", &state.graphql_url))
 }
 
-async fn authenticate(token: &str, key: &DecodingKey, db: &DatabaseConnection) -> Option<User> {
-    let id = jsonwebtoken::decode::<Claims>(token, key, &Validation::new(Algorithm::HS512))
-        .ok()?
+#[derive(Debug, Error)]
+enum AuthError {
+    #[error(transparent)]
+    Db(#[from] db::Error),
+    #[error(transparent)]
+    Jwt(#[from] jsonwebtoken::errors::Error),
+    #[error("no auth token given")]
+    NoToken,
+}
+
+async fn authenticate(
+    token: &str,
+    key: &DecodingKey,
+    db: &DatabaseConnection,
+) -> Result<User, AuthError> {
+    let id = jsonwebtoken::decode::<Claims>(token, key, &Validation::new(Algorithm::HS512))?
         .claims
         .id;
-    get_user(db, id).await.ok().flatten()
+    get_user(db, id).await.map_err(Into::into)
 }
